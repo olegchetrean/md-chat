@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1A2D4E" />
+  <title>MD-Chat — EU Sovereign Messenger</title>
+  <meta name="description" content="MD-Chat este un messenger sovereign EU construit în Moldova pe protocolul Matrix, cu AI confidențial integrat. Open source. EU-compliant din Day 1." />
+  <meta property="og:title" content="MD-Chat — EU Sovereign Messenger" />
+  <meta property="og:description" content="Open source. EU-compliant. Built in Moldova. The first Matrix-based fork with native AI integration." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://md-chat.eu" />
+  <meta property="og:image" content="https://md-chat.eu/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="/favicon.ico" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'navy': '#1A2D4E',
+            'teal': '#2DD4BF',
+            'snow': '#F8FAFC',
+            'verified': '#1E40AF',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+</head>
+<body class="bg-navy text-snow font-sans antialiased">
+  <header class="container mx-auto px-6 py-8 flex justify-between items-center max-w-6xl">
+    <a href="/" class="flex items-center gap-2">
+      <div class="w-10 h-10 rounded-full bg-teal flex items-center justify-center font-bold text-navy">MC</div>
+      <span class="text-xl font-semibold">md-chat</span>
+    </a>
+    <nav class="hidden md:flex gap-6 text-sm">
+      <a href="#features" class="hover:text-teal">Features</a>
+      <a href="#compliance" class="hover:text-teal">Compliance</a>
+      <a href="#roadmap" class="hover:text-teal">Roadmap</a>
+      <a href="https://github.com/olegchetrean/md-chat" class="hover:text-teal">GitHub</a>
+    </nav>
+    <a href="https://github.com/olegchetrean/md-chat" class="px-4 py-2 bg-teal text-navy rounded-lg font-semibold hover:bg-opacity-90 transition text-sm">
+      Star on GitHub
+    </a>
+  </header>
+
+  <section class="container mx-auto px-6 py-20 max-w-6xl">
+    <div class="grid md:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="inline-block px-3 py-1 bg-teal/20 text-teal text-xs font-mono rounded-full mb-4">PUBLIC LAUNCH MAY 18, 2026</span>
+        <h1 class="text-5xl md:text-6xl font-bold leading-tight mb-6">
+          A sovereign EU messenger,<br />
+          built in <span class="text-teal">Moldova</span>.
+        </h1>
+        <p class="text-lg text-snow/80 mb-8 leading-relaxed">
+          Matrix protocol + libsignal + native AI confidential compute + EVO/MPass identity. Open source (AGPLv3 + Apache 2.0). EU-compliant from Day 1.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4">
+          <a href="https://github.com/olegchetrean/md-chat" class="px-6 py-3 bg-teal text-navy rounded-lg font-semibold hover:bg-opacity-90 transition text-center">
+            Explore the code
+          </a>
+          <a href="#manifesto" class="px-6 py-3 border border-snow/30 rounded-lg font-semibold hover:bg-snow/10 transition text-center">
+            Read the manifesto
+          </a>
+        </div>
+      </div>
+      <div class="hidden md:block">
+        <div class="bg-snow/5 border border-snow/10 rounded-2xl p-6 backdrop-blur">
+          <div class="font-mono text-sm text-snow/80 space-y-2">
+            <div><span class="text-teal">$</span> git clone github.com/olegchetrean/md-chat</div>
+            <div><span class="text-teal">$</span> cd md-chat &amp;&amp; ./infra/scripts/deploy.sh up</div>
+            <div class="text-snow/40">— Spinning up Synapse + AI layer + Element Web...</div>
+            <div class="text-teal">✓ Server live at https://msg.md-chat.eu</div>
+            <div class="text-teal">✓ AI layer ready</div>
+            <div class="text-teal">✓ Identity: EVO/MPass ready</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="manifesto" class="container mx-auto px-6 py-20 max-w-4xl">
+    <h2 class="text-3xl font-bold mb-8 text-teal">Why MD-Chat exists</h2>
+    <div class="space-y-6 text-lg text-snow/80 leading-relaxed">
+      <p>France has Tchap (600k+ civil servants mandated). Germany has BwMessenger and gematik TI-Messenger (74M healthcare users). Belgium has BEAM. Italy has IO. Ukraine has Diia.</p>
+      <p>Moldova — an EU candidate since 2022, with ~2.5M citizens + 1M+ diaspora — has none of this. The communication infrastructure is dominated by Telegram (politically fragile after the August 2024 Durov arrest), Viber (Rakuten-owned, declining product investment), and WhatsApp (Meta).</p>
+      <p>In 2026, this is a national security risk.</p>
+      <p class="text-snow font-medium">MD-Chat is the answer. Open source. EU-compliant from Day 1. Built in Moldova IT Park. Bootstrapped on $0 cash + sweat equity + EU grant ladder.</p>
+    </div>
+  </section>
+
+  <section id="features" class="container mx-auto px-6 py-20 max-w-6xl">
+    <h2 class="text-3xl font-bold mb-12 text-teal">What makes MD-Chat different</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="text-teal text-3xl font-bold mb-3">1.</div>
+        <h3 class="text-xl font-semibold mb-3">Verified Authentic Digital Twin</h3>
+        <p class="text-snow/80 text-sm leading-relaxed">An AI clone of you, attested via eIDAS qualified signature. Responds 24/7 in your style. Revocable. Audit trail. No Western messenger has this.</p>
+      </div>
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="text-teal text-3xl font-bold mb-3">2.</div>
+        <h3 class="text-xl font-semibold mb-3">Confidential AI on group chats</h3>
+        <p class="text-snow/80 text-sm leading-relaxed">Group summarization, sentiment, action items — running in a verifiable enclave. We never see your content. Apple PCC pattern, applied to messaging.</p>
+      </div>
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="text-teal text-3xl font-bold mb-3">3.</div>
+        <h3 class="text-xl font-semibold mb-3">MCP-first bot ecosystem</h3>
+        <p class="text-snow/80 text-sm leading-relaxed">Every bot is also a Model Context Protocol server. Callable by Claude, GPT, any LLM externally. Inverse of WeChat's walled garden.</p>
+      </div>
+    </div>
+
+    <h3 class="text-2xl font-semibold mb-6 mt-12">Plus everything you'd expect</h3>
+    <div class="grid md:grid-cols-2 gap-4 text-sm text-snow/80">
+      <div>✓ End-to-end encryption (libsignal + MLS RFC 9420 + PQXDH post-quantum)</div>
+      <div>✓ Voice + video calls (LiveKit / Matrix RTC)</div>
+      <div>✓ EVO/MPass identity (Moldova government)</div>
+      <div>✓ eIDAS Wallet ready (EU 2027)</div>
+      <div>✓ Wero + SEPA Instant + MIA payments</div>
+      <div>✓ Mini-apps platform (TMA-compatible)</div>
+      <div>✓ Stories + channels + communities</div>
+      <div>✓ Hardware-backed keys (Secure Enclave / StrongBox)</div>
+      <div>✓ Multi-device sync via MLS</div>
+      <div>✓ Bilingual UI: Romanian + Russian native</div>
+    </div>
+  </section>
+
+  <section id="compliance" class="container mx-auto px-6 py-20 max-w-6xl">
+    <h2 class="text-3xl font-bold mb-12 text-teal">EU compliance, from Day 1</h2>
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="font-mono text-xs text-teal mb-1">2 AUGUST 2026</div>
+        <h3 class="text-xl font-semibold mb-2">AI Act Article 50</h3>
+        <p class="text-snow/80 text-sm">Chatbot disclosure, GPAI transparency, watermarking — designed in from Day 1.</p>
+      </div>
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="font-mono text-xs text-teal mb-1">18 AUGUST 2026</div>
+        <h3 class="text-xl font-semibold mb-2">eEvidence Regulation</h3>
+        <p class="text-snow/80 text-sm">24/7 production order portal, EU Representative (Prighter Brussels), audit log.</p>
+      </div>
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="font-mono text-xs text-teal mb-1">11 SEPTEMBER 2026</div>
+        <h3 class="text-xl font-semibold mb-2">Cyber Resilience Act</h3>
+        <p class="text-snow/80 text-sm">24h vulnerability disclosure, SBOM (CycloneDX), CE marking pipeline.</p>
+      </div>
+      <div class="bg-snow/5 border border-snow/10 rounded-xl p-6">
+        <div class="font-mono text-xs text-teal mb-1">23 AUGUST 2026</div>
+        <h3 class="text-xl font-semibold mb-2">Moldova Law 195/2024</h3>
+        <p class="text-snow/80 text-sm">Full GDPR alignment, CNPDCP registration, native compliance posture.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap" class="container mx-auto px-6 py-20 max-w-6xl">
+    <h2 class="text-3xl font-bold mb-12 text-teal">Public roadmap</h2>
+    <div class="space-y-6">
+      <div class="border-l-2 border-teal pl-6 py-2">
+        <div class="font-mono text-xs text-teal mb-1">Q3 2026 (M0-M3)</div>
+        <h3 class="text-lg font-semibold">Foundations</h3>
+        <p class="text-snow/80 text-sm">Public repo. AI layer open-sourced. NLnet submitted. AI Act + eEvidence compliance live. First B2B pilots.</p>
+      </div>
+      <div class="border-l-2 border-snow/30 pl-6 py-2">
+        <div class="font-mono text-xs text-snow/60 mb-1">Q4 2026 (M4-M6)</div>
+        <h3 class="text-lg font-semibold">Beta</h3>
+        <p class="text-snow/80 text-sm">Phone + TOTP + EVO/MPass beta. 5-10 paying customers. Prototype Fund DE applied.</p>
+      </div>
+      <div class="border-l-2 border-snow/30 pl-6 py-2">
+        <div class="font-mono text-xs text-snow/60 mb-1">Q1 2027 (M7-M9)</div>
+        <h3 class="text-lg font-semibold">Confidential AI</h3>
+        <p class="text-snow/80 text-sm">Group AI on confidential compute. Digital Twin self-mode. Verified Authentic Twin spec submitted IETF.</p>
+      </div>
+      <div class="border-l-2 border-snow/30 pl-6 py-2">
+        <div class="font-mono text-xs text-snow/60 mb-1">Q2 2027 (M10-M12)</div>
+        <h3 class="text-lg font-semibold">Public 1.0</h3>
+        <p class="text-snow/80 text-sm">Stable 1.0 release. 10k+ users. Romania expansion. Horizon Europe consortium.</p>
+      </div>
+    </div>
+    <p class="text-sm text-snow/60 mt-8 italic">Hard kill-switch at month 18: if no €50k grants AND no €3k MRR, we shutdown honestly. We commit to transparency.</p>
+  </section>
+
+  <section class="container mx-auto px-6 py-20 max-w-4xl text-center">
+    <h2 class="text-4xl font-bold mb-6">Get involved</h2>
+    <p class="text-lg text-snow/80 mb-8">
+      We're applying to NLnet NGI Zero Commons Fund (deadline 30 May 2026). Looking for contributors, co-applicants, B2B early-access customers, EU sovereign tech partners.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="https://github.com/olegchetrean/md-chat" class="px-6 py-3 bg-teal text-navy rounded-lg font-semibold hover:bg-opacity-90 transition">
+        github.com/olegchetrean/md-chat
+      </a>
+      <a href="https://fosstodon.org/@mdchat" class="px-6 py-3 border border-snow/30 rounded-lg font-semibold hover:bg-snow/10 transition">
+        @mdchat@fosstodon.org
+      </a>
+      <a href="mailto:contact@md-chat.eu" class="px-6 py-3 border border-snow/30 rounded-lg font-semibold hover:bg-snow/10 transition">
+        contact@md-chat.eu
+      </a>
+    </div>
+  </section>
+
+  <footer class="border-t border-snow/10 py-12 mt-12">
+    <div class="container mx-auto px-6 max-w-6xl">
+      <div class="flex flex-col md:flex-row justify-between gap-8 text-sm text-snow/60">
+        <div>
+          <p class="font-semibold text-snow mb-2">MD-Chat</p>
+          <p>Built by Mega Promoting SRL, Moldova IT Park</p>
+          <p class="mt-2">Open source: AGPLv3 (server, clients) + Apache 2.0 (AI layer)</p>
+        </div>
+        <div class="flex gap-6 flex-wrap">
+          <a href="/privacy" class="hover:text-teal">Privacy</a>
+          <a href="/terms" class="hover:text-teal">Terms</a>
+          <a href="/legal/sub-processors" class="hover:text-teal">Sub-processors</a>
+          <a href="/security" class="hover:text-teal">Security</a>
+        </div>
+      </div>
+      <div class="mt-8 pt-8 border-t border-snow/5 text-xs text-snow/40 text-center">
+        © 2026 Mega Promoting SRL. MD-Chat is a project under Mega Promoting SRL.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

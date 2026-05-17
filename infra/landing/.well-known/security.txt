@@ -1,0 +1,5 @@
+Contact: mailto:security@md-chat.eu
+Expires: 2027-05-17T18:00:00.000Z
+Preferred-Languages: en, ro, ru
+Canonical: https://md-chat.eu/.well-known/security.txt
+Policy: https://md-chat.eu/security

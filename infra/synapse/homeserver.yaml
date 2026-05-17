@@ -1,0 +1,133 @@
+# MD-Chat Synapse configuration.
+# Reference: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
+
+server_name: "msg.md-chat.eu"
+public_baseurl: "https://msg.md-chat.eu"
+pid_file: /data/homeserver.pid
+report_stats: false
+serve_server_wellknown: true
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::', '0.0.0.0']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: mdchat_synapse
+    password: ${POSTGRES_PASSWORD}
+    database: mdchat_synapse
+    host: postgres
+    cp_min: 5
+    cp_max: 10
+
+# Redis for federation & rate limiting.
+redis:
+  enabled: true
+  host: redis
+  port: 6379
+  password: ${REDIS_PASSWORD}
+
+# Logging.
+log_config: "/data/log.config"
+
+# Registration — gated initially. We'll switch to phone+TOTP via custom auth provider once ready.
+enable_registration: false
+enable_registration_without_verification: false
+registration_requires_token: true
+
+# Limits.
+max_upload_size: 50M
+max_image_pixels: 32M
+url_preview_enabled: false  # privacy: no automatic link previews.
+
+# E2EE.
+encryption_enabled_by_default_for_room_type: all
+
+# Federation — start closed, open selectively.
+federation_domain_whitelist:
+  - matrix.org
+  - mozilla.org
+  - tchncs.de
+
+# Allow federation but rate-limit aggressively.
+federation_rr_transactions_per_room_per_second: 30
+
+# Push notifications.
+push:
+  include_content: false
+  group_unread_count_by_room: false
+
+# Retention defaults. Per-room can override.
+retention:
+  enabled: true
+  default_policy:
+    min_lifetime: 1d
+    max_lifetime: 180d
+  allowed_lifetime_min: 1d
+  allowed_lifetime_max: 365d
+
+# Media.
+media_store_path: /data/media_store
+media_retention:
+  local_media_lifetime: 365d
+  remote_media_lifetime: 30d
+
+# Bcrypt rounds for password hashing.
+bcrypt_rounds: 12
+
+# Trust X-Forwarded-For from nginx.
+x_forwarded: true
+
+# Default password policy.
+password_config:
+  enabled: true
+  localdb_enabled: true
+  policy:
+    enabled: true
+    minimum_length: 10
+    require_digit: true
+    require_symbol: false
+    require_lowercase: true
+    require_uppercase: false
+
+# Application services — register md-chat-ai as appservice for AI features.
+app_service_config_files:
+  - /data/appservices/md-chat-ai.yaml
+
+# OpenID Connect — used for EVO/MPass bridge (later sprint).
+oidc_providers: []
+
+# CAS, SAML providers — used for MPass SAML2 (Sprint 6).
+saml2_config:
+  enabled: false  # enable in Sprint 6.
+
+# Modules.
+modules: []
+
+# Signing key — generated separately.
+signing_key_path: "/data/msg.md-chat.eu.signing.key"
+
+# Trusted key servers.
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# Metrics for Prometheus.
+enable_metrics: true
+metrics_flags:
+  known_servers: true
+
+# Reporting controls.
+suppress_key_server_warning: false
+
+# CRA-required telemetry: NO telemetry by default. We report security via security@md-chat.eu.
+
+# AI Act Art 50 — disclosure handled in client UI, not server-side.
+
+# eEvidence — preservation order handling in custom module (Sprint 4).

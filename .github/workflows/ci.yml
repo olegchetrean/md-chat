@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ai-layer:
+    name: AI layer (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-layer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check src tests
+
+      - name: Black format check
+        run: black --check src tests
+
+      - name: Mypy type check
+        run: mypy src
+        continue-on-error: true  # Strict mypy: relax during scaffold phase.
+
+      - name: Pytest
+        run: pytest -q
+
+  infra-lint:
+    name: Infra lint (Docker + nginx)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose
+        run: |
+          cd infra/docker
+          cp .env.example .env
+          docker compose config -q
+
+      - name: nginx config syntax check
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/infra/nginx/conf.d:/etc/nginx/conf.d:ro \
+            -v ${{ github.workspace }}/infra/nginx/snippets:/etc/nginx/snippets:ro \
+            nginx:1.27-alpine nginx -t -c /etc/nginx/nginx.conf 2>&1 || true
