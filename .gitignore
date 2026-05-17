@@ -13,3 +13,9 @@ __pycache__/
 venv/
 *.tsbuildinfo
 
+
+# Coverage + egg-info (build artifacts)
+.coverage
+htmlcov/
+coverage.xml
+*.egg-info/

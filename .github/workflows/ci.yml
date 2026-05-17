@@ -37,8 +37,23 @@ jobs:
         run: mypy src
         continue-on-error: true  # Strict mypy: relax during scaffold phase.
 
-      - name: Pytest
-        run: pytest -q
+      - name: Pytest with coverage
+        run: |
+          pytest -q \
+            --cov=md_chat_ai \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-fail-under=70
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-layer-coverage
+          path: |
+            ai-layer/coverage.xml
+            ai-layer/htmlcov/
 
   infra-lint:
     name: Infra lint (Docker + nginx)

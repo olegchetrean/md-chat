@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title desc">
+  <title id="title">MD-Chat favicon</title>
+  <desc id="desc">Minimal 32 by 32 favicon: teal MC monogram on a navy rounded square.</desc>
+  <rect x="0" y="0" width="32" height="32" rx="7" ry="7" fill="#1A2D4E"/>
+  <!-- Simplified "M" -->
+  <path d="M 6 8 L 9 8 L 12 16 L 15 8 L 18 8 L 18 24 L 16 24 L 16 13 L 13 21 L 11 21 L 8 13 L 8 24 L 6 24 Z" fill="#2DD4BF"/>
+  <!-- Simplified "C" -->
+  <path d="M 27 12
+           A 6 6 0 1 0 27 20
+           L 25 18
+           A 4 4 0 1 1 25 14 Z" fill="#2DD4BF"/>
+</svg>

@@ -1,0 +1,181 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version (e.g. 0.1.0). MUST match pyproject.toml."
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as prerelease?"
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: "Create as draft (default true — Oleg approves)?"
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Validate version + tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+      tag: ${{ steps.compute.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version + tag
+        id: compute
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VER="${{ inputs.version }}"
+          else
+            VER="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Verify semver shape
+        run: |
+          VER="${{ steps.compute.outputs.version }}"
+          echo "Validating semver: $VER"
+          echo "$VER" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+
+      - name: Verify pyproject version matches
+        run: |
+          VER="${{ steps.compute.outputs.version }}"
+          PY_VER=$(grep -E '^version\s*=' ai-layer/pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "pyproject.toml version: $PY_VER"
+          echo "release version:        $VER"
+          test "$PY_VER" = "$VER"
+
+  build:
+    name: Build artefacts
+    needs: validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-layer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Upload Python artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: ai-layer/dist/*
+
+  changelog:
+    name: Generate changelog draft
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      notes: ${{ steps.draft.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Draft notes
+        id: draft
+        run: |
+          PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+          {
+            echo "## MD-Chat AI Layer ${{ needs.validate.outputs.tag }}"
+            echo
+            echo "_Released $(date -u +%Y-%m-%d)_"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "### Changes since $PREV"
+              git log --pretty=format:'- %s (%h)' "$PREV"..HEAD
+            else
+              echo "### Initial release"
+              git log --pretty=format:'- %s (%h)' | head -50
+            fi
+            echo
+            echo
+            echo "### Compliance"
+            echo "- EU AI Act Art 50 disclosure surface verified by CI"
+            echo "- GDPR data-minimisation defaults preserved (MPASS_RELEASE_IDNP=false)"
+            echo "- Cyber Resilience Act SBOM attached (CycloneDX)"
+            echo
+            echo "### Signing"
+            echo "- _GPG signature pending — release will be re-signed once Oleg's release key is generated._"
+          } > release-notes.md
+          cat release-notes.md
+          {
+            echo 'notes<<EOF'
+            cat release-notes.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  release:
+    name: Publish GitHub Release
+    needs: [validate, build, changelog]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: Download notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: notes
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.tag }}
+          name: "MD-Chat AI Layer ${{ needs.validate.outputs.tag }}"
+          body_path: notes/release-notes.md
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || false }}
+          files: dist/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trigger-sbom:
+    name: Trigger SBOM workflow
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Note
+        run: |
+          echo "SBOM workflow runs on tag push automatically (see sbom.yml)."
+          echo "Tag: ${{ needs.validate.outputs.tag }}"

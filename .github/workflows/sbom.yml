@@ -1,0 +1,136 @@
+name: SBOM
+
+# Generates a CycloneDX Software Bill of Materials on every release tag.
+# Aligned with the EU Cyber Resilience Act (CRA, Regulation (EU) 2024/2847)
+# Annex I §2(1) — "vulnerabilities and components, including by drawing up
+# a software bill of materials in a commonly used and machine-readable
+# format covering at the very least the top-level dependencies".
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  release:
+    types: [published, released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to attach SBOM to (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  python-sbom:
+    name: Python SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-layer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project + cyclonedx-bom
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install "cyclonedx-bom>=4.4"
+
+      - name: Generate CycloneDX SBOM (JSON)
+        run: |
+          cyclonedx-py environment \
+            --output-format JSON \
+            --output-file md-chat-ai-sbom.cdx.json \
+            --schema-version 1.5
+
+      - name: Generate CycloneDX SBOM (XML)
+        run: |
+          cyclonedx-py environment \
+            --output-format XML \
+            --output-file md-chat-ai-sbom.cdx.xml \
+            --schema-version 1.5
+
+      - name: Validate SBOM JSON shape
+        run: |
+          python -c "import json; d=json.load(open('md-chat-ai-sbom.cdx.json')); assert d.get('bomFormat')=='CycloneDX', d; print('components:', len(d.get('components', [])))"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: md-chat-ai-sbom
+          path: |
+            ai-layer/md-chat-ai-sbom.cdx.json
+            ai-layer/md-chat-ai-sbom.cdx.xml
+
+  image-sbom:
+    name: Container image SBOM (syft)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t md-chat-ai:sbom ai-layer
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate image SBOM (CycloneDX JSON)
+        run: |
+          syft md-chat-ai:sbom \
+            -o cyclonedx-json=md-chat-ai-image-sbom.cdx.json \
+            -o cyclonedx-xml=md-chat-ai-image-sbom.cdx.xml
+
+      - name: Upload image SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: md-chat-ai-image-sbom
+          path: |
+            md-chat-ai-image-sbom.cdx.json
+            md-chat-ai-image-sbom.cdx.xml
+
+  attach-to-release:
+    name: Attach SBOMs to release
+    needs: [python-sbom, image-sbom]
+    if: github.event_name == 'push' || github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Python SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: md-chat-ai-sbom
+          path: sbom
+
+      - name: Download image SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: md-chat-ai-image-sbom
+          path: sbom
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: sbom/*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

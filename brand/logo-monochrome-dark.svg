@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">MD-Chat monochrome logo for light backgrounds</title>
+  <desc id="desc">Single color dark variant of the MC monogram, intended for use on light backgrounds.</desc>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="#1A2D4E" stroke-width="20"/>
+  <g fill="#1A2D4E" stroke="none">
+    <path d="M 130 150 L 178 150 L 178 362 L 130 362 Z"/>
+    <path d="M 246 150 L 294 150 L 294 362 L 246 362 Z"/>
+    <path d="M 130 150 L 178 150 L 230 268 L 212 290 Z"/>
+    <path d="M 294 150 L 246 150 L 194 268 L 212 290 Z"/>
+    <path d="M 470 256
+             A 102 102 0 1 0 368 358
+             L 368 318
+             A 62 62 0 1 1 430 256
+             Z"/>
+    <path d="M 368 358
+             L 368 318
+             A 62 62 0 0 0 410 296
+             L 446 318
+             A 102 102 0 0 1 368 358
+             Z"/>
+  </g>
+</svg>

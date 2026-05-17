@@ -1,0 +1,58 @@
+# MD-Chat — Code ownership rules.
+#
+# Reviewers listed here are auto-requested on pull requests touching
+# the matching paths. The LAST matching rule wins for a given file.
+# See https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Catch-all — Oleg owns the repository by default.
+*                                @olegchetrean
+
+# ---------------------------------------------------------------------------
+# AI layer (Python) — primary surface, owned by the AI lead.
+# ---------------------------------------------------------------------------
+/ai-layer/                        @olegchetrean
+/ai-layer/src/md_chat_ai/auth/    @olegchetrean
+/ai-layer/src/md_chat_ai/identity/ @olegchetrean
+/ai-layer/src/md_chat_ai/eevidence/ @olegchetrean
+/ai-layer/src/md_chat_ai/llm/     @olegchetrean
+/ai-layer/src/md_chat_ai/agents/  @olegchetrean
+/ai-layer/src/md_chat_ai/graph/   @olegchetrean
+/ai-layer/src/md_chat_ai/security/ @olegchetrean
+/ai-layer/src/md_chat_ai/reports/ @olegchetrean
+
+# Tests + CI infrastructure.
+/ai-layer/tests/                  @olegchetrean
+/.github/                         @olegchetrean
+/.github/workflows/               @olegchetrean
+/.github/CODEOWNERS               @olegchetrean
+
+# ---------------------------------------------------------------------------
+# Documentation, compliance, governance.
+# ---------------------------------------------------------------------------
+/docs/                            @olegchetrean
+/docs/compliance.md               @olegchetrean
+/docs/release-process.md          @olegchetrean
+/docs/testing.md                  @olegchetrean
+/SECURITY.md                      @olegchetrean
+/LICENSE                          @olegchetrean
+/AUTHORS                          @olegchetrean
+/CODE_OF_CONDUCT.md               @olegchetrean
+/CONTRIBUTING.md                  @olegchetrean
+
+# ---------------------------------------------------------------------------
+# Infrastructure (Docker, nginx, Synapse, Postgres).
+# ---------------------------------------------------------------------------
+/infra/                           @olegchetrean
+/server/                          @olegchetrean
+
+# ---------------------------------------------------------------------------
+# Native clients — owned by client leads (placeholder, fill in once hired).
+# ---------------------------------------------------------------------------
+/client-android/                  @olegchetrean
+/client-ios/                      @olegchetrean
+/web/                             @olegchetrean
+
+# ---------------------------------------------------------------------------
+# Brand assets — design lead reviews together with Oleg.
+# ---------------------------------------------------------------------------
+/brand/                           @olegchetrean

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">MD-Chat primary logo</title>
+  <desc id="desc">Monogram MC in bright teal on a deep navy circular background. Sovereign messenger from Moldova.</desc>
+  <!-- Navy circle background -->
+  <circle cx="256" cy="256" r="240" fill="#1A2D4E"/>
+  <!-- Subtle inner safe-zone (invisible, kept as guide) -->
+  <!-- Monogram "MC" — geometric, bold, drawn as paths so font is not required -->
+  <g fill="#2DD4BF" stroke="none">
+    <!-- Letter M: two verticals + center V -->
+    <!-- Left vertical bar -->
+    <path d="M 130 150 L 178 150 L 178 362 L 130 362 Z"/>
+    <!-- Right vertical bar of M -->
+    <path d="M 246 150 L 294 150 L 294 362 L 246 362 Z"/>
+    <!-- M diagonal left (top-left to center-bottom) -->
+    <path d="M 130 150 L 178 150 L 230 268 L 212 290 Z"/>
+    <!-- M diagonal right (top-right to center-bottom) -->
+    <path d="M 294 150 L 246 150 L 194 268 L 212 290 Z"/>
+    <!-- Letter C: open arc on the right -->
+    <path d="M 470 256
+             A 102 102 0 1 0 368 358
+             L 368 318
+             A 62 62 0 1 1 430 256
+             Z"/>
+    <!-- C bottom hook to balance optical weight -->
+    <path d="M 368 358
+             L 368 318
+             A 62 62 0 0 0 410 296
+             L 446 318
+             A 102 102 0 0 1 368 358
+             Z"/>
+  </g>
+</svg>

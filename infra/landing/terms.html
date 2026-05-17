@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1A2D4E" />
+  <title>Termeni și condiții — MD-Chat</title>
+  <meta name="description" content="Termenii de utilizare ai MD-Chat. Open source AGPLv3 + Apache 2.0. Operator: Mega Promoting SRL, Moldova IT Park." />
+  <meta property="og:title" content="Termeni și condiții — MD-Chat" />
+  <meta property="og:description" content="Cum poți folosi MD-Chat. Termeni de serviciu, regulile comunității, garanții, limitări. Operator: Mega Promoting SRL." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://md-chat.eu/terms" />
+  <meta property="og:image" content="https://md-chat.eu/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="robots" content="index, follow" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="canonical" href="https://md-chat.eu/terms" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'navy': '#1A2D4E',
+            'teal': '#2DD4BF',
+            'snow': '#F8FAFC',
+            'verified': '#1E40AF',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+  <style>
+    .prose h2 { font-size: 1.5rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 1rem; color: #2DD4BF; }
+    .prose h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.75rem; color: #F8FAFC; }
+    .prose p { margin-bottom: 1rem; line-height: 1.75; color: rgba(248, 250, 252, 0.85); }
+    .prose ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: rgba(248, 250, 252, 0.85); }
+    .prose ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1rem; color: rgba(248, 250, 252, 0.85); }
+    .prose ul li, .prose ol li { margin-bottom: 0.35rem; line-height: 1.65; }
+    .prose code { background: rgba(248,250,252,0.08); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.85em; }
+    .prose strong { color: #F8FAFC; font-weight: 600; }
+    .prose a { color: #2DD4BF; text-decoration: underline; text-underline-offset: 2px; }
+    .prose a:hover { color: #5EEAD4; }
+  </style>
+</head>
+<body class="bg-navy text-snow font-sans antialiased">
+  <header class="container mx-auto px-6 py-8 flex justify-between items-center max-w-6xl">
+    <a href="/" class="flex items-center gap-2">
+      <div class="w-10 h-10 rounded-full bg-teal flex items-center justify-center font-bold text-navy">MC</div>
+      <span class="text-xl font-semibold">md-chat</span>
+    </a>
+    <nav class="hidden md:flex gap-6 text-sm">
+      <a href="/#features" class="hover:text-teal">Features</a>
+      <a href="/#compliance" class="hover:text-teal">Compliance</a>
+      <a href="/#roadmap" class="hover:text-teal">Roadmap</a>
+      <a href="https://github.com/olegchetrean/md-chat" class="hover:text-teal">GitHub</a>
+    </nav>
+    <a href="https://github.com/olegchetrean/md-chat" class="px-4 py-2 bg-teal text-navy rounded-lg font-semibold hover:bg-opacity-90 transition text-sm">
+      Star on GitHub
+    </a>
+  </header>
+
+  <main class="container mx-auto px-6 py-12 max-w-3xl">
+    <a href="/" class="text-sm text-teal hover:underline">&larr; Înapoi la pagina principală</a>
+    <h1 class="text-4xl md:text-5xl font-bold mt-6 mb-4">Termeni și condiții de utilizare</h1>
+    <p class="text-snow/60 text-sm font-mono mb-10">
+      Versiune 1.0 &middot; În vigoare de la 18 mai 2026
+    </p>
+
+    <div class="prose">
+      <p>Acești Termeni reglementează utilizarea serviciului MD-Chat, oferit de <strong>Mega Promoting SRL</strong> („noi", „operatorul"), Parcul IT Moldova, Chișinău. Prin crearea unui cont și utilizarea aplicației, vă declarați de acord cu acești Termeni. Dacă nu sunteți de acord, nu folosiți serviciul.</p>
+
+      <h2>1. Obiectul serviciului</h2>
+      <p>MD-Chat este o platformă de mesagerie sovereign cu următoarele componente:</p>
+      <ul>
+        <li>Mesagerie text, voce și video criptată end-to-end (E2EE) între utilizatori</li>
+        <li>Stocare media criptată cu retenție limitată pe server</li>
+        <li>Funcții AI opționale (Digital Twin, sumarizări, smart compose) operate în confidential compute</li>
+        <li>Identitate opțională „Verified by EVO" via MPass</li>
+        <li>Mini-aplicații, canale, comunități, plăți (când disponibile)</li>
+      </ul>
+      <p>Serverul și clienții sunt open source sub <strong>AGPLv3</strong>. Layer-ul AI este sub <strong>Apache 2.0</strong>. Documentația este sub <strong>CC-BY-SA 4.0</strong>. Codul: <a href="https://github.com/olegchetrean/md-chat">github.com/olegchetrean/md-chat</a>.</p>
+
+      <h2>2. Eligibilitate</h2>
+      <ul>
+        <li>Vârsta minimă: 16 ani</li>
+        <li>Nu sunteți pe lista de sancțiuni UE sau a unei jurisdicții cu care MD-Chat trebuie să respecte sancțiuni</li>
+        <li>Aveți capacitate juridică să încheiați acest contract</li>
+      </ul>
+
+      <h2>3. Contul dvs.</h2>
+      <ul>
+        <li>Sunteți responsabil de păstrarea în siguranță a credențialelor (parolă, TOTP, cheile E2EE)</li>
+        <li>Recomandăm activarea autentificării multifactor</li>
+        <li>În caz de pierdere a device-ului, anunțați-ne imediat la <a href="mailto:security@md-chat.eu">security@md-chat.eu</a> pentru revocare sesiuni</li>
+        <li>Putem suspenda un cont dacă există abuz documentat (a se vedea secțiunea 5)</li>
+      </ul>
+
+      <h2>4. Conduită acceptabilă</h2>
+      <p>Vă obligați să NU folosiți MD-Chat pentru:</p>
+      <ul>
+        <li>Conținut ilegal sub jurisdicția UE sau Moldova (incl. CSAM, terorism, fraudă, încălcări de proprietate intelectuală)</li>
+        <li>Spam, phishing, distribuire de malware</li>
+        <li>Hărțuire țintită, amenințări, dezvăluire fără consimțământ de informații private (doxxing)</li>
+        <li>Manipulare automatizată în scopul evaziunii rate-limit-urilor sau a moderării</li>
+        <li>Furt sau scrape de date despre alți utilizatori</li>
+      </ul>
+      <p><strong>Notă privind E2EE</strong>: nu citim conținutul mesajelor &mdash; tehnic nu putem. Aplicăm regulile de conduită prin semnale metadata (rate, raportări de la utilizatori, semnături cunoscute de spam) și prin moderarea conținutului public (canale, mini-aplicații).</p>
+
+      <h2>5. Suspendare și încetare</h2>
+      <p>Putem suspenda sau închide un cont în cazuri precum:</p>
+      <ul>
+        <li>Încălcări repetate sau grave ale secțiunii 4</li>
+        <li>Cereri legale obligatorii (ordin instanță, eEvidence Regulation)</li>
+        <li>Risc de securitate sistemic (cont compromis utilizat pentru atac)</li>
+      </ul>
+      <p>Vă notificăm despre suspendare în 24h, cu motiv, exceptând cazurile în care notificarea ar pune în pericol o investigație legală sau securitatea altor utilizatori. Aveți drept de contestație la <a href="mailto:appeals@md-chat.eu">appeals@md-chat.eu</a>.</p>
+      <p>Puteți închide contul oricând: Settings &rarr; Privacy &rarr; Delete Account. Datele se șterg permanent după o perioadă de grație de 30 de zile.</p>
+
+      <h2>6. Funcții plătite (Premium și Business)</h2>
+      <ul>
+        <li>Abonamentele sunt facturate de Stripe Payments Europe</li>
+        <li>Reîmprospătare automată lunară sau anuală, anulabilă oricând în Settings &rarr; Billing</li>
+        <li>Rambursare pro-rata în primele 14 zile pentru utilizatori UE, conform Directivei 2011/83/UE</li>
+        <li>TVA-ul se aplică conform OSS UE / cotei locale</li>
+      </ul>
+
+      <h2>7. Proprietate intelectuală</h2>
+      <ul>
+        <li>Software MD-Chat (server, clienți, AI layer) este open source &mdash; vedeți licențele în fiecare repository</li>
+        <li>Marca „MD-Chat" și logo-ul aparțin Mega Promoting SRL &mdash; utilizare permisă conform <a href="https://github.com/olegchetrean/md-chat/blob/main/TRADEMARK.md">policy-ului de marcă</a></li>
+        <li>Conținutul utilizatorilor rămâne proprietatea acestora; ne acordați o licență tehnică limitată pentru transmiterea și stocarea criptată în vederea livrării</li>
+        <li>Nu folosim conținutul utilizatorilor pentru antrenarea modelelor AI fără consimțământ explicit, revocabil</li>
+      </ul>
+
+      <h2>8. Răspundere și garanții</h2>
+      <p>MD-Chat este oferit „așa cum este" pentru utilizatorii free-tier. Pentru utilizatorii Premium/Business, garantăm:</p>
+      <ul>
+        <li>SLA de uptime 99.5% lunar pentru serviciile principale</li>
+        <li>Răspuns la incident de securitate critic în 24h, conform Cyber Resilience Act</li>
+        <li>Notificare de breach în 72h, conform GDPR art. 33&ndash;34</li>
+      </ul>
+      <p>În măsura permisă de lege, răspunderea noastră maximă este limitată la suma plătită de dvs. în ultimele 12 luni pentru servicii Premium/Business. Această limitare nu se aplică în caz de dolozitate sau neglijență gravă.</p>
+
+      <h2>9. Cooperarea cu autoritățile</h2>
+      <p>Cooperăm cu cererile legale legitime ale autorităților UE și Republicii Moldova, conform proceselor publice descrise la <a href="/legal/eu-evidence">md-chat.eu/legal/eu-evidence</a>. Publicăm un Transparency Report semestrial detaliind numărul și tipul cererilor primite și onorate.</p>
+      <p>Nu suntem însă tehnic capabili să furnizăm conținutul mesajelor E2EE &mdash; nu putem ceea ce nu putem decripta.</p>
+
+      <h2>10. Modificări ale Termenilor</h2>
+      <p>Vă notificăm modificările materiale cu 30 de zile în avans, in-app și prin email. Continuarea utilizării după intrarea în vigoare reprezintă acceptare. Dacă nu sunteți de acord, puteți închide contul gratis.</p>
+
+      <h2>11. Legea aplicabilă și jurisdicția</h2>
+      <p>Acești Termeni sunt guvernați de:</p>
+      <ul>
+        <li>Pentru utilizatorii din Republica Moldova: legea Republicii Moldova, instanțele Chișinău</li>
+        <li>Pentru utilizatorii din UE: legea statului membru de reședință a consumatorului, conform art. 6 Regulamentul Roma I; instanța de la domiciliul consumatorului</li>
+        <li>Pentru alți utilizatori: legea Republicii Moldova, instanțele Chișinău, fără a aduce atingere drepturilor consumatorilor de a invoca jurisdicția lor obligatorie</li>
+      </ul>
+      <p>Soluționare alternativă: platforma ODR a UE &mdash; <a href="https://ec.europa.eu/consumers/odr">ec.europa.eu/consumers/odr</a>.</p>
+
+      <h2>12. Contact</h2>
+      <ul>
+        <li>General: <a href="mailto:contact@md-chat.eu">contact@md-chat.eu</a></li>
+        <li>Aspecte legale: <a href="mailto:legal@md-chat.eu">legal@md-chat.eu</a></li>
+        <li>Reprezentant UE: Prighter SARL, Avenue Louise 65, 1050 Bruxelles, Belgia &mdash; <a href="mailto:eu-rep@md-chat.eu">eu-rep@md-chat.eu</a></li>
+        <li>Adresa fizică: Mega Promoting SRL, Parcul IT Moldova, Chișinău, Republica Moldova</li>
+      </ul>
+    </div>
+  </main>
+
+  <footer class="border-t border-snow/10 py-12 mt-12">
+    <div class="container mx-auto px-6 max-w-6xl">
+      <div class="flex flex-col md:flex-row justify-between gap-8 text-sm text-snow/60">
+        <div>
+          <p class="font-semibold text-snow mb-2">MD-Chat</p>
+          <p>Built by Mega Promoting SRL, Moldova IT Park</p>
+          <p class="mt-2">Open source: AGPLv3 (server, clients) + Apache 2.0 (AI layer)</p>
+        </div>
+        <div class="flex gap-6 flex-wrap">
+          <a href="/privacy.html" class="hover:text-teal">Privacy</a>
+          <a href="/terms.html" class="hover:text-teal">Terms</a>
+          <a href="/legal/sub-processors" class="hover:text-teal">Sub-processors</a>
+          <a href="/security.html" class="hover:text-teal">Security</a>
+        </div>
+      </div>
+      <div class="mt-8 pt-8 border-t border-snow/5 text-xs text-snow/40 text-center">
+        &copy; 2026 Mega Promoting SRL. MD-Chat is a project under Mega Promoting SRL.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

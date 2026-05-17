@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-labelledby="title desc">
+  <title id="title">MD-Chat wordmark</title>
+  <desc id="desc">Lowercase wordmark md-chat in teal on a navy background. Set in a geometric grotesque similar to Inter Bold.</desc>
+  <rect width="640" height="160" fill="#1A2D4E"/>
+  <text x="50%" y="50%"
+        dominant-baseline="middle"
+        text-anchor="middle"
+        font-family="Inter, 'Helvetica Neue', system-ui, sans-serif"
+        font-weight="700"
+        font-size="92"
+        letter-spacing="-2"
+        fill="#2DD4BF">md-chat</text>
+</svg>

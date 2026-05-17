@@ -1,0 +1,129 @@
+/* ============================================================================
+ * MD-Chat — Brand color tokens
+ * Reference: brand/README.md  +  brand-spec v1 (2026-05-17)
+ *
+ * Usage:
+ *   @import url("./brand/colors.css");
+ *   .button { background: var(--mdchat-teal); color: var(--mdchat-navy); }
+ *
+ * Theme switching:
+ *   <html data-theme="dark">   // forces dark
+ *   <html data-theme="light">  // forces light
+ *   (no attribute)             // follows prefers-color-scheme
+ * ============================================================================ */
+
+:root {
+  /* ---- Primary palette (semantic, never change name) ------------------- */
+  --mdchat-navy:     #1A2D4E;
+  --mdchat-teal:     #2DD4BF;
+  --mdchat-snow:     #F8FAFC;
+
+  /* ---- Secondary palette ---------------------------------------------- */
+  --mdchat-slate:    #475569;
+  --mdchat-coral:    #FB7185;
+  --mdchat-gold:     #FBBF24;
+
+  /* ---- Verified / trust badges ---------------------------------------- */
+  --mdchat-verified: #1E40AF;
+
+  /* ---- Status semantics ----------------------------------------------- */
+  --mdchat-success:  #10B981;
+  --mdchat-warning:  #F59E0B;
+  --mdchat-error:    #EF4444;
+  --mdchat-info:     #3B82F6;
+
+  /* ---- Light-mode role tokens (defaults) ------------------------------ */
+  --bg:              var(--mdchat-snow);
+  --bg-elevated:     #FFFFFF;
+  --surface:         #FFFFFF;
+  --surface-muted:   #F1F5F9;
+  --border:          #E2E8F0;
+
+  --text:            var(--mdchat-navy);
+  --text-muted:      var(--mdchat-slate);
+  --text-inverse:    var(--mdchat-snow);
+
+  --accent:          var(--mdchat-teal);
+  --accent-contrast: var(--mdchat-navy);
+  --focus-ring:      var(--mdchat-teal);
+
+  --link:            #0F766E;          /* darker teal for AA on snow */
+  --link-hover:      #0D9488;
+}
+
+/* ---- Explicit dark theme (data attribute) ----------------------------- */
+[data-theme="dark"] {
+  --bg:              var(--mdchat-navy);
+  --bg-elevated:     #22365A;
+  --surface:         #22365A;
+  --surface-muted:   #1F3050;
+  --border:          #2F4570;
+
+  --text:            var(--mdchat-snow);
+  --text-muted:      #94A3B8;
+  --text-inverse:    var(--mdchat-navy);
+
+  --accent:          var(--mdchat-teal);
+  --accent-contrast: var(--mdchat-navy);
+  --focus-ring:      var(--mdchat-teal);
+
+  --link:            var(--mdchat-teal);
+  --link-hover:      #5EEAD4;
+}
+
+/* ---- OLED true-black mode --------------------------------------------- */
+[data-theme="black"] {
+  --bg:              #000000;
+  --bg-elevated:     #0A0A0A;
+  --surface:         #0A0A0A;
+  --surface-muted:   #111111;
+  --border:          #1F2937;
+
+  --text:            var(--mdchat-snow);
+  --text-muted:      #94A3B8;
+  --text-inverse:    #000000;
+
+  --accent:          var(--mdchat-teal);
+  --accent-contrast: #000000;
+  --focus-ring:      var(--mdchat-teal);
+
+  --link:            var(--mdchat-teal);
+  --link-hover:      #5EEAD4;
+}
+
+/* ---- Automatic dark when no theme attribute is set -------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg:              var(--mdchat-navy);
+    --bg-elevated:     #22365A;
+    --surface:         #22365A;
+    --surface-muted:   #1F3050;
+    --border:          #2F4570;
+
+    --text:            var(--mdchat-snow);
+    --text-muted:      #94A3B8;
+    --text-inverse:    var(--mdchat-navy);
+
+    --link:            var(--mdchat-teal);
+    --link-hover:      #5EEAD4;
+  }
+}
+
+/* ---- Utility classes (optional) --------------------------------------- */
+.bg-navy       { background-color: var(--mdchat-navy); }
+.bg-teal       { background-color: var(--mdchat-teal); }
+.bg-snow       { background-color: var(--mdchat-snow); }
+
+.text-navy     { color: var(--mdchat-navy); }
+.text-teal     { color: var(--mdchat-teal); }
+.text-snow     { color: var(--mdchat-snow); }
+.text-slate    { color: var(--mdchat-slate); }
+
+.badge-verified {
+  background: var(--mdchat-verified);
+  color: var(--mdchat-snow);
+}
+.badge-premium {
+  background: var(--mdchat-gold);
+  color: var(--mdchat-navy);
+}
