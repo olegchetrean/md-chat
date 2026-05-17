@@ -12,7 +12,7 @@ Thanks for your interest! MD-Chat is built by Mega Promoting SRL with a communit
 ## Development setup
 
 ```bash
-git clone https://github.com/megapromoting/md-chat
+git clone https://github.com/olegchetrean/md-chat
 cd md-chat
 
 # Server (Synapse fork)
