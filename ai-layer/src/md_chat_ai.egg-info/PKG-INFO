@@ -1,0 +1,151 @@
+Metadata-Version: 2.4
+Name: md-chat-ai
+Version: 0.1.0
+Summary: AI organizing layer for MD-Chat sovereign messenger (Cronberry-derived)
+Author-email: Mega Promoting SRL <contact@md-chat.eu>
+License:                                  Apache License
+                                   Version 2.0, January 2004
+                                http://www.apache.org/licenses/
+        
+           Copyright 2026 Mega Promoting SRL
+        
+           Licensed under the Apache License, Version 2.0 (the "License");
+           you may not use this file except in compliance with the License.
+           You may obtain a copy of the License at
+        
+               http://www.apache.org/licenses/LICENSE-2.0
+        
+           Unless required by applicable law or agreed to in writing, software
+           distributed under the License is distributed on an "AS IS" BASIS,
+           WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+           See the License for the specific language governing permissions and
+           limitations under the License.
+        
+           Portions of this code are derived from the Cronberry engine,
+           the internal AI contact intelligence product of Mega Promoting SRL,
+           licensed for use in this open-source project.
+        
+Project-URL: Homepage, https://md-chat.eu
+Project-URL: Repository, https://github.com/olegchetrean/md-chat
+Classifier: Development Status :: 3 - Alpha
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: flask>=3.0
+Requires-Dist: pydantic>=2.5
+Requires-Dist: neo4j>=5.20
+Requires-Dist: httpx>=0.27
+Requires-Dist: anthropic>=0.40
+Requires-Dist: openai>=1.40
+Requires-Dist: redis>=5.0
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: structlog>=24.1
+Requires-Dist: prometheus-client>=0.20
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: ruff>=0.5; extra == "dev"
+Requires-Dist: black>=24.4; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+Dynamic: license-file
+
+# md-chat-ai
+
+> AI organizing layer for MD-Chat. Derived from the Cronberry engine (Mega Promoting internal product, licensed for use; released here under Apache 2.0).
+
+## What it does
+
+- **Digital Twin engine** — AI personas that respond on a user's behalf when offline. Supports `auto_reply`, `business_24_7`, `vacation` modes. Optional eIDAS attestation (Verified Authentic Twin).
+- **Knowledge graph** — Neo4j-backed social graph. Computes PageRank, community detection, mutual contacts.
+- **Multi-provider LLM client** — Router by MP gateway + Anthropic + OpenAI + local Llama 3.2. Aggressive caching.
+- **Daily briefing** — per-user summary of overnight activity. Confidential compute.
+- **Smart compose / summarization / sentiment / action items** — on-device when possible, confidential cloud (Apple PCC pattern) otherwise.
+- **SaaS infrastructure** — multi-tenant API keys (`mc_*`), Stripe billing, onboarding flow.
+
+## Architecture
+
+```
+md-chat-ai/
+├── src/md_chat_ai/
+│   ├── api/         Flask blueprint + request schemas
+│   ├── agents/      Digital Twin engine
+│   ├── graph/       Neo4j knowledge graph
+│   ├── llm/         Multi-provider LLM client with fallback + cache
+│   ├── memory/      Short/Long/Relationship memory
+│   ├── security/    Prompt guard + GDPR helpers + rate limiter
+│   └── api_mcp.py   MCP server endpoint
+├── tests/           pytest suite
+├── pyproject.toml
+└── Dockerfile
+```
+
+## Quick start (development)
+
+```bash
+cd ai-layer
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Set up env
+cp .env.example .env.local
+# Edit .env.local
+
+# Run
+python -m md_chat_ai.wsgi
+# Or via Docker:
+docker build -t md-chat-ai . && docker run --env-file .env.local -p 5002:5002 md-chat-ai
+```
+
+## API
+
+Base URL: `https://msg.md-chat.eu/api/ai/` (production) or `http://localhost:5002/api/` (dev)
+
+### Health
+```
+GET /health        Service status + config
+GET /metrics       Prometheus metrics (port 9090)
+```
+
+### Digital Twin
+```
+POST /twin/<user_id>/chat        Chat with twin
+GET  /twin/<user_id>/profile     Get twin persona
+POST /twin/<user_id>/optimize    Optimize message before sending
+POST /twin/<user_id>/feedback    Learning loop
+```
+
+### Knowledge graph
+```
+POST /graph/build                Build social graph from Synapse events
+GET  /graph/stats                Counts + summary
+GET  /graph/visual               Cytoscape-compatible JSON
+```
+
+### Reports
+```
+POST /report/generate            Generate report from template
+GET  /briefing                   Daily digest for current user
+```
+
+### SaaS (multi-tenant)
+```
+POST /saas/register              Generate API key
+GET  /saas/usage                 Tenant usage
+POST /saas/billing/checkout      Stripe checkout
+```
+
+See `docs/api.md` for full reference.
+
+## License
+
+**Apache License 2.0** — see [LICENSE](LICENSE).
+
+Built on the Cronberry engine, licensed by Mega Promoting SRL for use in this open-source project.
+
+## Status
+
+🚧 **Scaffold** (Sprint 1). Production-grade `digital_twin.py`, `simulation/*`, `graph/*` to be ported from Cronberry over Sprint 5.
