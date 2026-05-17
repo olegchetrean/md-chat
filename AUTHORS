@@ -1,0 +1,22 @@
+# MD-Chat Authors
+
+## Founder & maintainer
+- Oleg Chetrean <oleg@megapromoting.com>
+
+## Core contributors
+(To be added as people contribute)
+
+## Acknowledgments
+
+MD-Chat builds heavily on the work of:
+- The Matrix.org Foundation and Element team (Synapse, Element X)
+- The Signal Foundation (libsignal, Sealed Sender, PQXDH)
+- The OpenMLS project (MLS RFC 9420 implementation)
+- The LiveKit team (voice/video infrastructure)
+- The Cronberry AI engine (Mega Promoting internal product, licensed for use)
+
+We are grateful for the broader EU sovereign tech community: NLnet, Sovereign Tech Fund Germany, Prototype Fund, the FOSDEM organizing team, and the many activists, researchers, and policymakers fighting for end-to-end encryption and digital sovereignty in Europe.
+
+---
+
+*This file is opt-in. Contributors are listed only with their permission.*

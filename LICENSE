@@ -1,0 +1,23 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+  Different components in this repository are licensed under different terms.
+  See the LICENSE file in each subdirectory for the applicable terms:
+
+  - server/         — AGPLv3 (full text below)
+  - client-ios/     — AGPLv3 (downstream of Element X iOS)
+  - client-android/ — AGPLv3 (downstream of Element X Android)
+  - web/            — AGPLv3 (downstream of Element Web)
+  - ai-layer/       — Apache License 2.0 (see ai-layer/LICENSE)
+  - infra/, docs/, brand/  — Creative Commons Attribution-ShareAlike 4.0
+                              International (see docs/LICENSE-CC-BY-SA)
+
+  AGPLv3 full text: https://www.gnu.org/licenses/agpl-3.0.txt
+  Apache 2.0 full text: https://www.apache.org/licenses/LICENSE-2.0.txt
+  CC-BY-SA 4.0 full text: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+  Copyright (c) 2026 Mega Promoting SRL, Moldova.
