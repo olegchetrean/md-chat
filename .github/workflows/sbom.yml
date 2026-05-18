@@ -47,17 +47,19 @@ jobs:
           pip install "cyclonedx-bom>=4.4"
 
       - name: Generate CycloneDX SBOM (JSON)
-        # cyclonedx-bom 5+ removed --schema-version (now via -sv). Default is 1.5.
+        # cyclonedx-bom 5+ uses short flags: --of (format), -o (output), --sv (schema).
         run: |
           cyclonedx-py environment \
-            --output-format JSON \
-            --outfile md-chat-ai-sbom.cdx.json
+            --of JSON \
+            --sv 1.5 \
+            -o md-chat-ai-sbom.cdx.json
 
       - name: Generate CycloneDX SBOM (XML)
         run: |
           cyclonedx-py environment \
-            --output-format XML \
-            --outfile md-chat-ai-sbom.cdx.xml
+            --of XML \
+            --sv 1.5 \
+            -o md-chat-ai-sbom.cdx.xml
 
       - name: Validate SBOM JSON shape
         run: |
