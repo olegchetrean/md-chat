@@ -1051,7 +1051,7 @@ def list_templates(language: Language | None = None) -> list[dict[str, str]]:
             t = variants[language]
             out.append({"key": key, "name": t.name, "language": t.language, "description": t.description})
         else:
-            for lang, t in variants.items():
+            for _lang, t in variants.items():
                 out.append(
                     {
                         "key": key,

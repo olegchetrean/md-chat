@@ -300,7 +300,7 @@ class Neo4jGraphBackend:
 
             return float(np.dot(a, b))
         except ImportError:
-            return sum(x * y for x, y in zip(a, b))
+            return sum(x * y for x, y in zip(a, b, strict=True))
 
     # ------------------------------------------------------------------
     # Internal helpers
