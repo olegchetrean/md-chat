@@ -20,9 +20,10 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -137,15 +138,11 @@ MPASS_ATTRIBUTE_NAMES: tuple[str, ...] = (
 #: Attributes our public OIDC bridge is *willing* to surface to chat
 #: clients. ``unique_identifier_personal_code`` (IDNP) is deliberately
 #: omitted. See module-level docstring for the GDPR rationale.
-DEFAULT_RELEASED_ATTRIBUTES: frozenset[str] = frozenset(
-    {"verified", "birth_year", "given_name"}
-)
+DEFAULT_RELEASED_ATTRIBUTES: frozenset[str] = frozenset({"verified", "birth_year", "given_name"})
 
 #: Sensitive attribute names — must never be released unless the
 #: relying party explicitly enables the second-consent flow.
-SENSITIVE_ATTRIBUTES: frozenset[str] = frozenset(
-    {"unique_identifier_personal_code", "family_name", "email", "phone"}
-)
+SENSITIVE_ATTRIBUTES: frozenset[str] = frozenset({"unique_identifier_personal_code", "family_name", "email", "phone"})
 
 
 @dataclass(frozen=True)
@@ -162,7 +159,7 @@ class AttributeReleasePolicy:
     purpose: str = "chat_account_provisioning"
     release_idnp: bool = False
 
-    def with_idnp(self, *, purpose: str) -> "AttributeReleasePolicy":
+    def with_idnp(self, *, purpose: str) -> AttributeReleasePolicy:
         """Return a new policy that releases IDNP for the given purpose.
 
         ``purpose`` is logged on every release and is intended to be a
@@ -195,9 +192,7 @@ class AttributeReleasePolicy:
             if key in self.released:
                 out[key] = value
             elif key in SENSITIVE_ATTRIBUTES:
-                logger.info(
-                    "mpass: suppressed sensitive attribute %s (not in policy)", key
-                )
+                logger.info("mpass: suppressed sensitive attribute %s (not in policy)", key)
             else:
                 # Unknown attributes are silently dropped.
                 logger.debug("mpass: dropped unrecognized attribute %s", key)
@@ -238,12 +233,13 @@ class MPassAttributes:
         loa: str | None = None,
         name_id: str | None = None,
         issued_at: _dt.datetime | None = None,
-    ) -> "MPassAttributes":
+    ) -> MPassAttributes:
         """Build from the dict returned by ``OneLogin_Saml2_Auth.get_attributes()``.
 
         ``python3-saml`` returns each attribute as a list of strings.
         We pull the first element and coerce types.
         """
+
         def _first(name: str) -> str | None:
             v = attributes.get(name)
             if v is None:
@@ -448,9 +444,7 @@ class MPassSamlSP:
         try:  # pragma: no cover — heavy native dep
             from onelogin.saml2.auth import OneLogin_Saml2_Auth
         except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(
-                "python3-saml is not installed; install the 'identity' extra"
-            ) from exc
+            raise RuntimeError("python3-saml is not installed; install the 'identity' extra") from exc
         return OneLogin_Saml2_Auth(dict(request_data), self.settings_dict())
 
     def build_authn_request(
@@ -464,17 +458,13 @@ class MPassSamlSP:
         redirect = auth.login(return_to=relay_state)
         return _SamlRequestEnvelope(redirect_url=redirect, relay_state=relay_state)
 
-    def process_response(
-        self, request_data: Mapping[str, Any]
-    ) -> MPassAttributes:
+    def process_response(self, request_data: Mapping[str, Any]) -> MPassAttributes:
         """Validate an inbound SAML response and return normalized attributes."""
         auth = self._load_auth(request_data)
         auth.process_response()
         errors = auth.get_errors()
         if errors:
-            raise SamlResponseError(
-                f"SAML response invalid: {errors}; last_error={auth.get_last_error_reason()}"
-            )
+            raise SamlResponseError(f"SAML response invalid: {errors}; last_error={auth.get_last_error_reason()}")
         if not auth.is_authenticated():
             raise SamlResponseError("SAML response did not authenticate the user")
         attrs = auth.get_attributes()
@@ -483,7 +473,7 @@ class MPassSamlSP:
             attrs,
             loa=loa,
             name_id=auth.get_nameid(),
-            issued_at=_dt.datetime.now(tz=_dt.timezone.utc),
+            issued_at=_dt.datetime.now(tz=_dt.UTC),
         )
 
 
@@ -502,7 +492,7 @@ def _read_file_or_empty(path: str) -> str:
     if not path:
         return ""
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             return fh.read()
     except OSError:
         logger.warning("mpass: could not read %s", path)

@@ -10,9 +10,11 @@ from .builder import (
 )
 from .entity_reader import (
     MDCHAT_ENTITY_TYPES,
-    EntityNode as ReaderEntityNode,
     FilteredEntities,
     MdChatEntityReader,
+)
+from .entity_reader import (
+    EntityNode as ReaderEntityNode,
 )
 from .neo4j_backend import (
     Edge,

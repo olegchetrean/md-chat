@@ -7,9 +7,6 @@ AI Act Art. 50 disclosure enforcement.
 
 from __future__ import annotations
 
-import os
-import tempfile
-
 import pytest
 
 from md_chat_ai.security import (
@@ -20,10 +17,10 @@ from md_chat_ai.security import (
     RateLimiter,
 )
 
-
 # ---------------------------------------------------------------------------
 # PromptGuard
 # ---------------------------------------------------------------------------
+
 
 class TestPromptGuard:
     def test_safe_input_passes(self) -> None:
@@ -80,9 +77,7 @@ class TestPromptGuard:
 
     def test_scan_pii_returns_findings(self) -> None:
         guard = PromptGuard()
-        findings = guard.scan_pii(
-            "Contact: oleg@example.com or +373 60 005 418, IBAN MD24AG000000022500123104"
-        )
+        findings = guard.scan_pii("Contact: oleg@example.com or +373 60 005 418, IBAN MD24AG000000022500123104")
         types = {f["type"] for f in findings}
         assert "email" in types
         assert "phone_number" in types
@@ -99,6 +94,7 @@ class TestPromptGuard:
 # ---------------------------------------------------------------------------
 # RateLimiter — namespaced
 # ---------------------------------------------------------------------------
+
 
 class TestRateLimiter:
     def test_signup_namespace_60s_cooldown(self) -> None:
@@ -146,6 +142,7 @@ class TestRateLimiter:
 # ---------------------------------------------------------------------------
 # GDPR
 # ---------------------------------------------------------------------------
+
 
 class _FakeStore:
     """Mock store implementing the DataStore protocol for tests."""
@@ -195,9 +192,7 @@ class TestGDPR:
         records = gdpr_manager.get_processing_records(purpose_filter="data_export")
         assert any(r["user_id"] == "user:42" for r in records)
 
-    def test_erase_user_data_immediate_wipes_all_stores(
-        self, gdpr_manager: GDPRManager
-    ) -> None:
+    def test_erase_user_data_immediate_wipes_all_stores(self, gdpr_manager: GDPRManager) -> None:
         twin = _FakeStore("twin")
         twin.add("user:99", {"persona": "Alex"})
         graph = _FakeStore("graph")
@@ -206,9 +201,7 @@ class TestGDPR:
         audit.add("user:99", {"events": 12})
         gdpr_manager._stores = {"twin": twin, "graph": graph, "audit": audit}
 
-        result = gdpr_manager.erase_user_data(
-            "user:99", grace_period_days=0, execute_immediately=True
-        )
+        result = gdpr_manager.erase_user_data("user:99", grace_period_days=0, execute_immediately=True)
 
         assert result["status"] == "executed"
         assert twin.records == {}
@@ -220,18 +213,14 @@ class TestGDPR:
         # consent always reported even when no rows
         assert "consent" in result["stores"]
 
-    def test_erase_user_data_default_90d_grace(
-        self, gdpr_manager: GDPRManager
-    ) -> None:
+    def test_erase_user_data_default_90d_grace(self, gdpr_manager: GDPRManager) -> None:
         gdpr_manager._stores = {"twin": _FakeStore("twin")}
         result = gdpr_manager.erase_user_data("user:future")
         assert result["status"] == "scheduled"
         assert result["grace_period_days"] == 90
         assert result["scheduled_at"] > result.get("requested_at", "")
 
-    def test_erase_user_data_then_export_includes_request(
-        self, gdpr_manager: GDPRManager
-    ) -> None:
+    def test_erase_user_data_then_export_includes_request(self, gdpr_manager: GDPRManager) -> None:
         gdpr_manager._stores = {"twin": _FakeStore("twin")}
         gdpr_manager.erase_user_data("user:7", grace_period_days=30)
         export = gdpr_manager.export_user_data("user:7")
@@ -251,6 +240,7 @@ class TestGDPR:
 # ---------------------------------------------------------------------------
 # AIDisclosure — EU AI Act Art. 50
 # ---------------------------------------------------------------------------
+
 
 class TestAIDisclosure:
     def test_enforce_adds_disclosure_when_missing_ro(self) -> None:
@@ -292,10 +282,17 @@ class TestAIDisclosure:
 # Smoke: package imports cleanly
 # ---------------------------------------------------------------------------
 
+
 def test_security_package_exports() -> None:
     from md_chat_ai import security
+
     for name in (
-        "PromptGuard", "RateLimiter", "GDPRManager", "AIDisclosure",
-        "AISafetyFilter", "ErrorHandler", "register_security",
+        "PromptGuard",
+        "RateLimiter",
+        "GDPRManager",
+        "AIDisclosure",
+        "AISafetyFilter",
+        "ErrorHandler",
+        "register_security",
     ):
         assert hasattr(security, name), f"security.{name} missing"

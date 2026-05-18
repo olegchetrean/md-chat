@@ -30,12 +30,13 @@ from __future__ import annotations
 import logging
 import threading
 import uuid as _uuid
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any
 
 from ..config import CONFIG
 from .neo4j_backend import Neo4jGraphBackend
-from .ontology import CONSENT_TIERS, normalise_consent_tier
+from .ontology import normalise_consent_tier
 
 logger = logging.getLogger("md_chat_ai.graph.builder")
 
@@ -52,10 +53,10 @@ class GraphInfo:
     graph_id: str
     node_count: int
     edge_count: int
-    entity_types: List[str]
-    consent_breakdown: Dict[str, int] = field(default_factory=dict)
+    entity_types: list[str]
+    consent_breakdown: dict[str, int] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "graph_id": self.graph_id,
             "node_count": self.node_count,
@@ -69,8 +70,8 @@ class GraphInfo:
 class ParsedEvent:
     """Result of parsing one Matrix event into graph fragments."""
 
-    nodes: List[Dict[str, Any]] = field(default_factory=list)
-    edges: List[Dict[str, Any]] = field(default_factory=list)
+    nodes: list[dict[str, Any]] = field(default_factory=list)
+    edges: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +105,7 @@ class SynapseEventAdapter:
     """
 
     #: Room types we treat as broadcast Channels rather than Groups.
-    CHANNEL_ROOM_TYPES: Tuple[str, ...] = ("m.space", "m.channel")
+    CHANNEL_ROOM_TYPES: tuple[str, ...] = ("m.space", "m.channel")
 
     def __init__(self, default_consent_tier: str = "private") -> None:
         """
@@ -117,7 +118,7 @@ class SynapseEventAdapter:
     # Public API
     # ------------------------------------------------------------------
 
-    def parse_event(self, event: Dict[str, Any]) -> ParsedEvent:
+    def parse_event(self, event: dict[str, Any]) -> ParsedEvent:
         """
         Convert a single Matrix event into a :class:`ParsedEvent`.
 
@@ -135,7 +136,7 @@ class SynapseEventAdapter:
             return ParsedEvent()
         return method(self, event)
 
-    def parse_events(self, events: Iterable[Dict[str, Any]]) -> ParsedEvent:
+    def parse_events(self, events: Iterable[dict[str, Any]]) -> ParsedEvent:
         """
         Convert a batch of Matrix events, concatenating their results.
 
@@ -156,21 +157,19 @@ class SynapseEventAdapter:
     # Per-event-type handlers
     # ------------------------------------------------------------------
 
-    def _resolve_tier(self, event: Dict[str, Any]) -> str:
+    def _resolve_tier(self, event: dict[str, Any]) -> str:
         """Pull ``consent_tier`` from event content or fall back to default."""
         content = event.get("content", {}) or {}
         tier = content.get("consent_tier") or event.get("consent_tier")
         return normalise_consent_tier(tier, default=self.default_consent_tier)
 
     @staticmethod
-    def _opt_in(event: Dict[str, Any]) -> bool:
+    def _opt_in(event: dict[str, Any]) -> bool:
         """Whether the user opted in to having content ingested."""
         content = event.get("content", {}) or {}
-        return bool(
-            content.get("opt_in_content") or event.get("opt_in_content")
-        )
+        return bool(content.get("opt_in_content") or event.get("opt_in_content"))
 
-    def _handle_room_member(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_room_member(self, event: dict[str, Any]) -> ParsedEvent:
         """``m.room.member`` join → MEMBER_OF / MEMBER_OF_CHANNEL."""
         content = event.get("content", {}) or {}
         membership = content.get("membership")
@@ -183,9 +182,7 @@ class SynapseEventAdapter:
             return ParsedEvent()
 
         tier = self._resolve_tier(event)
-        room_type = (content.get("room_type")
-                     or event.get("room_type")
-                     or "m.room")
+        room_type = content.get("room_type") or event.get("room_type") or "m.room"
         is_channel = room_type in self.CHANNEL_ROOM_TYPES
         target_type = "Channel" if is_channel else "Group"
         edge_type = "MEMBER_OF_CHANNEL" if is_channel else "MEMBER_OF"
@@ -214,7 +211,7 @@ class SynapseEventAdapter:
         }
         return ParsedEvent(nodes=[user_node, room_node], edges=[edge])
 
-    def _handle_room_message(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_room_message(self, event: dict[str, Any]) -> ParsedEvent:
         """``m.room.message`` → optional MENTIONED edges for tagged users."""
         content = event.get("content", {}) or {}
         sender = event.get("sender")
@@ -223,47 +220,49 @@ class SynapseEventAdapter:
             return ParsedEvent()
 
         tier = self._resolve_tier(event)
-        mentions: List[str] = []
+        mentions: list[str] = []
         # Matrix MSC2674 mentions
-        m_mentions = (
-            content.get("m.mentions")
-            or content.get("mentions")
-            or {}
-        )
+        m_mentions = content.get("m.mentions") or content.get("mentions") or {}
         if isinstance(m_mentions, dict):
             mentions = list(m_mentions.get("user_ids") or [])
 
         opt_in_content = self._opt_in(event)
         body = content.get("body", "") if opt_in_content else ""
 
-        nodes: List[Dict[str, Any]] = [{
-            "name": sender,
-            "entity_type": "User",
-            "consent_tier": tier,
-            "attributes": {"matrix_id": sender},
-            "summary": "",
-        }]
-        edges: List[Dict[str, Any]] = []
-
-        for target in mentions:
-            nodes.append({
-                "name": target,
+        nodes: list[dict[str, Any]] = [
+            {
+                "name": sender,
                 "entity_type": "User",
                 "consent_tier": tier,
-                "attributes": {"matrix_id": target},
+                "attributes": {"matrix_id": sender},
                 "summary": "",
-            })
-            edges.append({
-                "source": sender,
-                "target": target,
-                "edge_type": "MENTIONED",
-                "fact": body[:200] if opt_in_content else "",
-                "consent_tier": tier,
-                "attributes": {},
-            })
+            }
+        ]
+        edges: list[dict[str, Any]] = []
+
+        for target in mentions:
+            nodes.append(
+                {
+                    "name": target,
+                    "entity_type": "User",
+                    "consent_tier": tier,
+                    "attributes": {"matrix_id": target},
+                    "summary": "",
+                }
+            )
+            edges.append(
+                {
+                    "source": sender,
+                    "target": target,
+                    "edge_type": "MENTIONED",
+                    "fact": body[:200] if opt_in_content else "",
+                    "consent_tier": tier,
+                    "attributes": {},
+                }
+            )
         return ParsedEvent(nodes=nodes, edges=edges)
 
-    def _handle_contact_added(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_contact_added(self, event: dict[str, Any]) -> ParsedEvent:
         """``md.chat.contact_added`` → RELATED edge."""
         content = event.get("content", {}) or {}
         source = event.get("sender") or content.get("source")
@@ -289,17 +288,19 @@ class SynapseEventAdapter:
                     "summary": "",
                 },
             ],
-            edges=[{
-                "source": source,
-                "target": target,
-                "edge_type": "RELATED",
-                "fact": content.get("note", ""),
-                "consent_tier": tier,
-                "attributes": {},
-            }],
+            edges=[
+                {
+                    "source": source,
+                    "target": target,
+                    "edge_type": "RELATED",
+                    "fact": content.get("note", ""),
+                    "consent_tier": tier,
+                    "attributes": {},
+                }
+            ],
         )
 
-    def _handle_business_owned(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_business_owned(self, event: dict[str, Any]) -> ParsedEvent:
         """``md.chat.business_owned`` → OWNS_BUSINESS edge."""
         content = event.get("content", {}) or {}
         owner = event.get("sender") or content.get("owner")
@@ -320,22 +321,23 @@ class SynapseEventAdapter:
                     "name": company,
                     "entity_type": "Company",
                     "consent_tier": tier,
-                    "attributes": {"org_name": company,
-                                   "industry": content.get("industry", "")},
+                    "attributes": {"org_name": company, "industry": content.get("industry", "")},
                     "summary": "",
                 },
             ],
-            edges=[{
-                "source": owner,
-                "target": company,
-                "edge_type": "OWNS_BUSINESS",
-                "fact": content.get("role", "owner"),
-                "consent_tier": tier,
-                "attributes": {"role": content.get("role", "owner")},
-            }],
+            edges=[
+                {
+                    "source": owner,
+                    "target": company,
+                    "edge_type": "OWNS_BUSINESS",
+                    "fact": content.get("role", "owner"),
+                    "consent_tier": tier,
+                    "attributes": {"role": content.get("role", "owner")},
+                }
+            ],
         )
 
-    def _handle_miniapp_used(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_miniapp_used(self, event: dict[str, Any]) -> ParsedEvent:
         """``md.chat.miniapp_used`` → USED_MINIAPP edge."""
         content = event.get("content", {}) or {}
         user = event.get("sender") or content.get("user")
@@ -356,22 +358,23 @@ class SynapseEventAdapter:
                     "name": app,
                     "entity_type": "MiniApp",
                     "consent_tier": tier,
-                    "attributes": {"app_title": app,
-                                   "category": content.get("category", "")},
+                    "attributes": {"app_title": app, "category": content.get("category", "")},
                     "summary": "",
                 },
             ],
-            edges=[{
-                "source": user,
-                "target": app,
-                "edge_type": "USED_MINIAPP",
-                "fact": "",
-                "consent_tier": tier,
-                "attributes": {"last_used_at": event.get("origin_server_ts", "")},
-            }],
+            edges=[
+                {
+                    "source": user,
+                    "target": app,
+                    "edge_type": "USED_MINIAPP",
+                    "fact": "",
+                    "consent_tier": tier,
+                    "attributes": {"last_used_at": event.get("origin_server_ts", "")},
+                }
+            ],
         )
 
-    def _handle_twin_created(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_twin_created(self, event: dict[str, Any]) -> ParsedEvent:
         """``md.chat.twin_created`` → OWNS_TWIN edge."""
         content = event.get("content", {}) or {}
         owner = event.get("sender") or content.get("owner")
@@ -392,22 +395,23 @@ class SynapseEventAdapter:
                     "name": twin,
                     "entity_type": "Twin",
                     "consent_tier": tier,
-                    "attributes": {"twin_name": twin,
-                                   "model": content.get("model", "")},
+                    "attributes": {"twin_name": twin, "model": content.get("model", "")},
                     "summary": "",
                 },
             ],
-            edges=[{
-                "source": owner,
-                "target": twin,
-                "edge_type": "OWNS_TWIN",
-                "fact": "",
-                "consent_tier": tier,
-                "attributes": {"created_at_iso": event.get("origin_server_ts", "")},
-            }],
+            edges=[
+                {
+                    "source": owner,
+                    "target": twin,
+                    "edge_type": "OWNS_TWIN",
+                    "fact": "",
+                    "consent_tier": tier,
+                    "attributes": {"created_at_iso": event.get("origin_server_ts", "")},
+                }
+            ],
         )
 
-    def _handle_promise(self, event: Dict[str, Any]) -> ParsedEvent:
+    def _handle_promise(self, event: dict[str, Any]) -> ParsedEvent:
         """``md.chat.promise`` → PROMISED edge."""
         content = event.get("content", {}) or {}
         source = event.get("sender") or content.get("source")
@@ -432,33 +436,35 @@ class SynapseEventAdapter:
                     "summary": "",
                 },
             ],
-            edges=[{
-                "source": source,
-                "target": target,
-                "edge_type": "PROMISED",
-                "fact": content.get("text", "") if self._opt_in(event) else "",
-                "consent_tier": tier,
-                "attributes": {
-                    "promise_date": event.get("origin_server_ts", ""),
-                    "due_date": content.get("due_date", ""),
-                },
-            }],
+            edges=[
+                {
+                    "source": source,
+                    "target": target,
+                    "edge_type": "PROMISED",
+                    "fact": content.get("text", "") if self._opt_in(event) else "",
+                    "consent_tier": tier,
+                    "attributes": {
+                        "promise_date": event.get("origin_server_ts", ""),
+                        "due_date": content.get("due_date", ""),
+                    },
+                }
+            ],
         )
 
     #: Event-type → handler dispatch table. Defined after methods so it can
     #: reference them by name.
-    _DISPATCH: Dict[str, Callable[["SynapseEventAdapter", Dict[str, Any]], ParsedEvent]] = {}
+    _DISPATCH: dict[str, Callable[[SynapseEventAdapter, dict[str, Any]], ParsedEvent]] = {}
 
 
 # Populate the dispatch table after the class is defined.
 SynapseEventAdapter._DISPATCH = {
-    "m.room.member":            SynapseEventAdapter._handle_room_member,
-    "m.room.message":           SynapseEventAdapter._handle_room_message,
-    "md.chat.contact_added":    SynapseEventAdapter._handle_contact_added,
-    "md.chat.business_owned":   SynapseEventAdapter._handle_business_owned,
-    "md.chat.miniapp_used":     SynapseEventAdapter._handle_miniapp_used,
-    "md.chat.twin_created":     SynapseEventAdapter._handle_twin_created,
-    "md.chat.promise":          SynapseEventAdapter._handle_promise,
+    "m.room.member": SynapseEventAdapter._handle_room_member,
+    "m.room.message": SynapseEventAdapter._handle_room_message,
+    "md.chat.contact_added": SynapseEventAdapter._handle_contact_added,
+    "md.chat.business_owned": SynapseEventAdapter._handle_business_owned,
+    "md.chat.miniapp_used": SynapseEventAdapter._handle_miniapp_used,
+    "md.chat.twin_created": SynapseEventAdapter._handle_twin_created,
+    "md.chat.promise": SynapseEventAdapter._handle_promise,
 }
 
 
@@ -468,11 +474,11 @@ SynapseEventAdapter._DISPATCH = {
 
 
 def _pagerank(
-    nodes: List[str],
-    edges: List[Tuple[str, str]],
+    nodes: list[str],
+    edges: list[tuple[str, str]],
     damping: float = 0.85,
     iterations: int = 30,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute PageRank scores for a graph using power iteration.
 
@@ -490,15 +496,15 @@ def _pagerank(
     if not nodes:
         return {}
     n = len(nodes)
-    rank: Dict[str, float] = {node: 1.0 / n for node in nodes}
+    rank: dict[str, float] = {node: 1.0 / n for node in nodes}
 
-    outgoing: Dict[str, List[str]] = {node: [] for node in nodes}
+    outgoing: dict[str, list[str]] = {node: [] for node in nodes}
     for src, tgt in edges:
         if src in outgoing and tgt in rank:
             outgoing[src].append(tgt)
 
     for _ in range(iterations):
-        new_rank: Dict[str, float] = {node: (1.0 - damping) / n for node in nodes}
+        new_rank: dict[str, float] = {node: (1.0 - damping) / n for node in nodes}
         for node, outs in outgoing.items():
             if not outs:
                 # distribute mass uniformly when a node has no outgoing edges
@@ -514,10 +520,10 @@ def _pagerank(
 
 
 def _louvain(
-    nodes: List[str],
-    edges: List[Tuple[str, str]],
+    nodes: list[str],
+    edges: list[tuple[str, str]],
     max_passes: int = 5,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """
     Detect communities with a simplified Louvain-style modularity heuristic.
 
@@ -537,9 +543,9 @@ def _louvain(
     if not nodes:
         return {}
 
-    label: Dict[str, int] = {node: idx for idx, node in enumerate(nodes)}
+    label: dict[str, int] = {node: idx for idx, node in enumerate(nodes)}
 
-    neighbours: Dict[str, List[str]] = {node: [] for node in nodes}
+    neighbours: dict[str, list[str]] = {node: [] for node in nodes}
     for a, b in edges:
         if a in neighbours and b in neighbours:
             neighbours[a].append(b)
@@ -548,7 +554,7 @@ def _louvain(
     for _ in range(max_passes):
         changed = False
         for node in nodes:
-            counts: Dict[int, int] = {}
+            counts: dict[int, int] = {}
             for neigh in neighbours[node]:
                 lbl = label[neigh]
                 counts[lbl] = counts.get(lbl, 0) + 1
@@ -562,7 +568,7 @@ def _louvain(
             break
 
     # Compact community ids so they start at 0
-    remap: Dict[int, int] = {}
+    remap: dict[int, int] = {}
     for node in nodes:
         old = label[node]
         if old not in remap:
@@ -592,8 +598,8 @@ class GraphBuilderService:
 
     def __init__(
         self,
-        backend: Optional[Neo4jGraphBackend] = None,
-        adapter: Optional[SynapseEventAdapter] = None,
+        backend: Neo4jGraphBackend | None = None,
+        adapter: SynapseEventAdapter | None = None,
     ) -> None:
         """
         Args:
@@ -614,10 +620,10 @@ class GraphBuilderService:
 
     def build_graph_async(
         self,
-        events: List[Dict[str, Any]],
-        ontology: Dict[str, Any],
+        events: list[dict[str, Any]],
+        ontology: dict[str, Any],
         graph_name: str = "MD-Chat Graph",
-        on_complete: Optional[Callable[[GraphInfo], None]] = None,
+        on_complete: Callable[[GraphInfo], None] | None = None,
     ) -> str:
         """
         Launch the graph-build pipeline in a background thread.
@@ -646,10 +652,10 @@ class GraphBuilderService:
     def _build_graph_worker(
         self,
         graph_id: str,
-        events: List[Dict[str, Any]],
-        ontology: Dict[str, Any],
+        events: list[dict[str, Any]],
+        ontology: dict[str, Any],
         graph_name: str,
-        on_complete: Optional[Callable[[GraphInfo], None]],
+        on_complete: Callable[[GraphInfo], None] | None,
     ) -> None:
         """Background worker — runs the full ingestion pipeline."""
         try:
@@ -658,9 +664,8 @@ class GraphBuilderService:
                 on_complete(info)
         except Exception as exc:  # pragma: no cover - background only
             import traceback
-            logger.error(
-                f"Graph build failed for {graph_id}: {exc}\n{traceback.format_exc()}"
-            )
+
+            logger.error(f"Graph build failed for {graph_id}: {exc}\n{traceback.format_exc()}")
 
     # ------------------------------------------------------------------
     # Synchronous build (used by tests + the worker)
@@ -668,10 +673,10 @@ class GraphBuilderService:
 
     def build_graph_sync(
         self,
-        events: List[Dict[str, Any]],
-        ontology: Dict[str, Any],
+        events: list[dict[str, Any]],
+        ontology: dict[str, Any],
         graph_name: str = "MD-Chat Graph",
-        graph_id: Optional[str] = None,
+        graph_id: str | None = None,
     ) -> GraphInfo:
         """
         Synchronous build: useful for tests and CLIs.
@@ -733,7 +738,7 @@ class GraphBuilderService:
     async def _ingest_events(
         self,
         graph_id: str,
-        events: List[Dict[str, Any]],
+        events: list[dict[str, Any]],
     ) -> None:
         """Parse events via the adapter and write nodes/edges to the backend."""
         parsed = self.adapter.parse_events(events)
@@ -746,16 +751,14 @@ class GraphBuilderService:
         # ``private`` is more restrictive than ``friends`` which is more
         # restrictive than ``public`` — we keep the LEAST permissive value.
         tier_rank = {"public": 0, "friends": 1, "private": 2}
-        seen: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        seen: dict[tuple[str, str], dict[str, Any]] = {}
         for node in parsed.nodes:
             key = (node["name"], node["entity_type"])
             if key not in seen:
                 seen[key] = dict(node)
             else:
                 existing = seen[key]
-                if tier_rank.get(node["consent_tier"], 2) > tier_rank.get(
-                    existing["consent_tier"], 2
-                ):
+                if tier_rank.get(node["consent_tier"], 2) > tier_rank.get(existing["consent_tier"], 2):
                     existing["consent_tier"] = node["consent_tier"]
                 # Merge attributes
                 merged_attrs = dict(existing.get("attributes", {}))
@@ -787,7 +790,7 @@ class GraphBuilderService:
     # Analytics
     # ------------------------------------------------------------------
 
-    async def _run_analytics_async(self, graph_id: str) -> Dict[str, Any]:
+    async def _run_analytics_async(self, graph_id: str) -> dict[str, Any]:
         """
         Async variant of :meth:`_run_analytics` — usable from the build worker
         which already runs inside an event loop.
@@ -807,7 +810,7 @@ class GraphBuilderService:
         )
         return {"pagerank": ranks, "communities": communities}
 
-    def _run_analytics(self, graph_id: str) -> Dict[str, Any]:
+    def _run_analytics(self, graph_id: str) -> dict[str, Any]:
         """
         Run PageRank + Louvain on the current graph synchronously.
 
@@ -815,6 +818,7 @@ class GraphBuilderService:
         that are not themselves inside an event loop.
         """
         import asyncio
+
         return asyncio.run(self._run_analytics_async(graph_id))
 
     # ------------------------------------------------------------------
@@ -824,5 +828,6 @@ class GraphBuilderService:
     def delete_graph(self, graph_id: str) -> None:
         """Delete a graph (sync wrapper around the async backend method)."""
         import asyncio
+
         asyncio.run(self.backend.delete_graph(graph_id))
         logger.info(f"Deleted MD-Chat graph: {graph_id}")

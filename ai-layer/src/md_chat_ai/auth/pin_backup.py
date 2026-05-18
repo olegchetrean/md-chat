@@ -82,7 +82,7 @@ class WrappedBundle:
         )
 
     @classmethod
-    def from_json(cls, data: str) -> "WrappedBundle":
+    def from_json(cls, data: str) -> WrappedBundle:
         obj = json.loads(data)
         kdf = obj.get("kdf", {})
         return cls(

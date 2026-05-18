@@ -35,12 +35,12 @@ import json
 import logging
 import re
 import uuid
-from dataclasses import asdict, dataclass, field
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
-from ..config import CONFIG
 from .templates import (
     SUPPORTED_LANGUAGES,
     Language,
@@ -68,14 +68,14 @@ ComputeBackend = Literal["on_device", "router_pcc", "router_open"]
                           opted in
 """
 
-VALID_COMPUTE_BACKENDS: Tuple[ComputeBackend, ...] = (
+VALID_COMPUTE_BACKENDS: tuple[ComputeBackend, ...] = (
     "on_device",
     "router_pcc",
     "router_open",
 )
 
 
-AI_ACT_DISCLOSURES: Dict[Language, str] = {
+AI_ACT_DISCLOSURES: dict[Language, str] = {
     "ro": (
         "AVIZ AI Act (Art. 50): Acest raport a fost generat de un sistem AI. "
         "Continutul este destinat sustinerii deciziilor umane si nu inlocuieste "
@@ -117,11 +117,11 @@ class ReportSection:
 
     title: str
     content: str = ""
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
     tool_calls_made: int = 0
-    visualization_data: Optional[Dict[str, Any]] = None
+    visualization_data: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "title": self.title,
             "content": self.content,
@@ -149,17 +149,17 @@ class Report:
     requirement: str
     template_key: str = ""
     language: Language = "ro"
-    sections: List[ReportSection] = field(default_factory=list)
+    sections: list[ReportSection] = field(default_factory=list)
     status: ReportStatus = ReportStatus.PENDING
     compute_backend: ComputeBackend = "router_pcc"
     pii_redacted: bool = False
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    completed_at: Optional[str] = None
+    completed_at: str | None = None
     generation_time_seconds: float = 0.0
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "report_id": self.report_id,
             "title": self.title,
@@ -207,7 +207,7 @@ class Report:
 # ---------------------------------------------------------------------------
 
 
-def apply_pii_redaction(text: str) -> Tuple[str, bool]:
+def apply_pii_redaction(text: str) -> tuple[str, bool]:
     """Redact PII from arbitrary text.
 
     Tries to import the canonical ``security.prompt_guard.PIIRedactor`` first;
@@ -239,7 +239,7 @@ def apply_pii_redaction(text: str) -> Tuple[str, bool]:
 # LLM call signature
 # ---------------------------------------------------------------------------
 
-LLMCallable = Callable[[List[Dict[str, str]]], Awaitable[str]]
+LLMCallable = Callable[[list[dict[str, str]]], Awaitable[str]]
 """Async function ``(messages) -> assistant text``.
 
 Tests inject a mock implementation; production wires to ``llm.client``.
@@ -251,7 +251,7 @@ Tests inject a mock implementation; production wires to ``llm.client``.
 # ---------------------------------------------------------------------------
 
 
-async def _deterministic_llm(messages: List[Dict[str, str]]) -> str:
+async def _deterministic_llm(messages: list[dict[str, str]]) -> str:
     """Deterministic offline LLM stand-in used when no LLM is configured.
 
     Generates plausible section content from the system prompt's section
@@ -297,14 +297,13 @@ class ReportAgent:
 
     def __init__(
         self,
-        llm: Optional[LLMCallable] = None,
+        llm: LLMCallable | None = None,
         compute_backend: ComputeBackend = "router_pcc",
         redact_pii: bool = True,
     ) -> None:
         if compute_backend not in VALID_COMPUTE_BACKENDS:
             raise ValueError(
-                f"Invalid compute_backend '{compute_backend}'. "
-                f"Must be one of {VALID_COMPUTE_BACKENDS}."
+                f"Invalid compute_backend '{compute_backend}'. " f"Must be one of {VALID_COMPUTE_BACKENDS}."
             )
         self._llm: LLMCallable = llm or _deterministic_llm
         self.compute_backend: ComputeBackend = compute_backend
@@ -317,11 +316,11 @@ class ReportAgent:
     async def generate(
         self,
         template_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         *,
         language: Language = "ro",
-        requirement: Optional[str] = None,
-        compute_backend: Optional[ComputeBackend] = None,
+        requirement: str | None = None,
+        compute_backend: ComputeBackend | None = None,
     ) -> Report:
         """Generate a report for ``template_name`` in ``language``.
 
@@ -368,7 +367,7 @@ class ReportAgent:
         )
 
         try:
-            sections: List[ReportSection] = []
+            sections: list[ReportSection] = []
             for ts in template.sections:
                 sec = await self._generate_section(
                     template=template,
@@ -404,11 +403,11 @@ class ReportAgent:
     def generate_report(
         self,
         template_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         *,
         language: Language = "ro",
-        requirement: Optional[str] = None,
-        compute_backend: Optional[ComputeBackend] = None,
+        requirement: str | None = None,
+        compute_backend: ComputeBackend | None = None,
     ) -> Report:
         """Synchronous wrapper around :meth:`generate`."""
         return asyncio.run(
@@ -430,14 +429,14 @@ class ReportAgent:
         template: ReportTemplate,
         section_def: TemplateSection,
         requirement: str,
-        context: Dict[str, Any],
-        previous: List[ReportSection],
+        context: dict[str, Any],
+        previous: list[ReportSection],
     ) -> ReportSection:
         """Run one LLM call per section."""
         prev_titles = ", ".join(s.title for s in previous) or "(none)"
 
         # Sanitize free-text context fields before sending to LLM
-        safe_context: Dict[str, Any] = {}
+        safe_context: dict[str, Any] = {}
         for key, val in context.items():
             if isinstance(val, str) and self.redact_pii:
                 safe_val, _ = apply_pii_redaction(val)
@@ -451,8 +450,8 @@ class ReportAgent:
             context_json = repr(safe_context)
 
         system_prompt = (
-            f"You are writing the section: \"{section_def.title}\" of report "
-            f"\"{template.name}\" in language={template.language}.\n"
+            f'You are writing the section: "{section_def.title}" of report '
+            f'"{template.name}" in language={template.language}.\n'
             f"Description: {section_def.description}\n"
             f"Guidelines: {section_def.guidelines}\n"
             f"Target length: {section_def.min_words}-{section_def.max_words} words.\n"
@@ -462,11 +461,7 @@ class ReportAgent:
             "context. Write in the report's language."
         )
 
-        user_prompt = (
-            f"Requirement: {requirement}\n\n"
-            f"Context (JSON):\n{context_json}\n\n"
-            "Write the section now."
-        )
+        user_prompt = f"Requirement: {requirement}\n\n" f"Context (JSON):\n{context_json}\n\n" "Write the section now."
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -490,7 +485,7 @@ class ReportAgent:
 # ---------------------------------------------------------------------------
 
 
-def _extract_visualization(content: str) -> Tuple[Optional[Dict[str, Any]], str]:
+def _extract_visualization(content: str) -> tuple[dict[str, Any] | None, str]:
     """Pull a ```json:visualization``` fenced block out of LLM text."""
     pattern = re.compile(r"```json:visualization\s*(.*?)```", re.DOTALL)
     match = pattern.search(content)

@@ -32,8 +32,9 @@ import json
 import logging
 import secrets
 import time
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping, MutableMapping
+from typing import Any
 
 from .mpass_saml import (
     AttributeReleasePolicy,
@@ -197,9 +198,7 @@ class OIDCBridge:
         self.code_ttl = code_ttl
         self.codes: MutableMapping[str, AuthorizationCode] = {}
         self.tokens: MutableMapping[str, OIDCClaims] = {}
-        self._clients: dict[str, dict[str, Any]] = {
-            cid: dict(meta) for cid, meta in (registered_clients or {}).items()
-        }
+        self._clients: dict[str, dict[str, Any]] = {cid: dict(meta) for cid, meta in (registered_clients or {}).items()}
 
     # -- client registration ---------------------------------------------
 
@@ -270,7 +269,7 @@ class OIDCBridge:
             "code_challenge": code_challenge,
             "code_challenge_method": code_challenge_method,
             "request_idnp": request_idnp,
-            "policy_purpose": "msign_qualified_signature" if request_idnp else "chat_account_provisioning",
+            "policy_purpose": ("msign_qualified_signature" if request_idnp else "chat_account_provisioning"),
             "issued_at": time.time(),
         }
         return {"relay_state": relay_state, "scopes": list(scopes)}
@@ -409,9 +408,7 @@ class OIDCBridge:
         except ImportError:
             return {"keys": []}
         try:
-            key = serialization.load_pem_private_key(
-                self.signing_key_pem.encode("utf-8"), password=None
-            )
+            key = serialization.load_pem_private_key(self.signing_key_pem.encode("utf-8"), password=None)
         except Exception:
             logger.exception("oidc: failed to load signing key for JWKS")
             return {"keys": []}
@@ -456,9 +453,7 @@ class OIDCBridge:
         try:
             import jwt  # type: ignore
         except ImportError as exc:
-            raise RuntimeError(
-                "PyJWT is required to sign ID tokens; install the 'identity' extra"
-            ) from exc
+            raise RuntimeError("PyJWT is required to sign ID tokens; install the 'identity' extra") from exc
         return jwt.encode(
             payload,
             self.signing_key_pem,

@@ -33,7 +33,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import httpx
 
@@ -50,39 +50,39 @@ logger = logging.getLogger("md_chat_ai.llm")
 # ---------------------------------------------------------------------------
 # Format: model_id: (input_cents_per_1k, output_cents_per_1k, cache_read_cents_per_1k,
 #                    cache_write_cents_per_1k, family)
-_MODEL_REGISTRY: Dict[str, Tuple[float, float, float, float, str]] = {
+_MODEL_REGISTRY: dict[str, tuple[float, float, float, float, str]] = {
     # Anthropic Claude — cache_read = 10% of input, cache_write = 125% of input
-    "claude-opus-4-5":          (2.250, 11.250, 0.225, 2.812, "anthropic"),
-    "claude-opus-4-1":          (2.250, 11.250, 0.225, 2.812, "anthropic"),
-    "claude-sonnet-4-5":        (0.450,  2.250, 0.045, 0.562, "anthropic"),
-    "claude-sonnet-4":          (0.450,  2.250, 0.045, 0.562, "anthropic"),
-    "claude-haiku-4-5":         (0.150,  0.750, 0.015, 0.187, "anthropic"),
-    "claude-3-5-sonnet-latest": (0.450,  2.250, 0.045, 0.562, "anthropic"),
-    "claude-3-5-haiku-latest":  (0.150,  0.750, 0.015, 0.187, "anthropic"),
+    "claude-opus-4-5": (2.250, 11.250, 0.225, 2.812, "anthropic"),
+    "claude-opus-4-1": (2.250, 11.250, 0.225, 2.812, "anthropic"),
+    "claude-sonnet-4-5": (0.450, 2.250, 0.045, 0.562, "anthropic"),
+    "claude-sonnet-4": (0.450, 2.250, 0.045, 0.562, "anthropic"),
+    "claude-haiku-4-5": (0.150, 0.750, 0.015, 0.187, "anthropic"),
+    "claude-3-5-sonnet-latest": (0.450, 2.250, 0.045, 0.562, "anthropic"),
+    "claude-3-5-haiku-latest": (0.150, 0.750, 0.015, 0.187, "anthropic"),
     # OpenAI GPT-4o family
-    "gpt-4o":                   (0.375,  1.500, 0.187, 0.0,   "openai"),
-    "gpt-4o-mini":              (0.022,  0.090, 0.011, 0.0,   "openai"),
-    "gpt-4.1":                  (0.300,  1.200, 0.075, 0.0,   "openai"),
-    "gpt-4.1-mini":             (0.060,  0.240, 0.015, 0.0,   "openai"),
+    "gpt-4o": (0.375, 1.500, 0.187, 0.0, "openai"),
+    "gpt-4o-mini": (0.022, 0.090, 0.011, 0.0, "openai"),
+    "gpt-4.1": (0.300, 1.200, 0.075, 0.0, "openai"),
+    "gpt-4.1-mini": (0.060, 0.240, 0.015, 0.0, "openai"),
     # Google Gemini 2.5 family
-    "gemini-2.5-pro":           (0.187,  1.125, 0.0,   0.0,   "google"),
-    "gemini-2.5-flash":         (0.045,  0.262, 0.0,   0.0,   "google"),
-    "gemini-2.5-flash-lite":    (0.015,  0.060, 0.0,   0.0,   "google"),
+    "gemini-2.5-pro": (0.187, 1.125, 0.0, 0.0, "google"),
+    "gemini-2.5-flash": (0.045, 0.262, 0.0, 0.0, "google"),
+    "gemini-2.5-flash-lite": (0.015, 0.060, 0.0, 0.0, "google"),
     # DeepSeek
-    "deepseek-chat":            (0.041,  0.165, 0.010, 0.0,   "deepseek"),
-    "deepseek-reasoner":        (0.082,  0.330, 0.020, 0.0,   "deepseek"),
+    "deepseek-chat": (0.041, 0.165, 0.010, 0.0, "deepseek"),
+    "deepseek-reasoner": (0.082, 0.330, 0.020, 0.0, "deepseek"),
     # Mistral
-    "mistral-large-latest":     (0.300,  0.900, 0.0,   0.0,   "mistral"),
-    "mistral-small-latest":     (0.030,  0.090, 0.0,   0.0,   "mistral"),
+    "mistral-large-latest": (0.300, 0.900, 0.0, 0.0, "mistral"),
+    "mistral-small-latest": (0.030, 0.090, 0.0, 0.0, "mistral"),
     # Meta Llama (served via Router; on-device path uses local weights)
-    "llama-3.3-70b":            (0.088,  0.118, 0.0,   0.0,   "meta"),
-    "llama-3.2-3b":             (0.0,    0.0,   0.0,   0.0,   "local"),  # on-device
+    "llama-3.3-70b": (0.088, 0.118, 0.0, 0.0, "meta"),
+    "llama-3.2-3b": (0.0, 0.0, 0.0, 0.0, "local"),  # on-device
 }
 
 
 def _lookup_pricing(
     model: str,
-) -> Tuple[float, float, float, float, str]:
+) -> tuple[float, float, float, float, str]:
     """Return (input, output, cache_read, cache_write, family) cents-per-1k."""
     exact = _MODEL_REGISTRY.get(model)
     if exact:
@@ -107,9 +107,9 @@ def _compute_cost_cents(
     # Cached input tokens are billed at the cache-read rate, not full input rate.
     full_input = max(0, prompt_tokens - cache_read_tokens)
     return (
-        full_input          * in_c  / 1000.0
+        full_input * in_c / 1000.0
         + completion_tokens * out_c / 1000.0
-        + cache_read_tokens * cr_c  / 1000.0
+        + cache_read_tokens * cr_c / 1000.0
         + cache_write_tokens * cw_c / 1000.0
     )
 
@@ -117,6 +117,7 @@ def _compute_cost_cents(
 # ---------------------------------------------------------------------------
 # Confidential compute hook (Apple PCC / NVIDIA H100 CC stub).
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ConfidentialBackend:
@@ -129,14 +130,15 @@ class ConfidentialBackend:
     """
 
     enabled: bool = False
-    attestation: Optional[str] = None  # base64-encoded report when enabled
-    node_id: Optional[str] = None      # e.g. "pcc-node-eu-west-3-7"
-    enclave_type: Optional[str] = None  # "apple-pcc" | "nvidia-h100-cc" | "amd-sev"
+    attestation: str | None = None  # base64-encoded report when enabled
+    node_id: str | None = None  # e.g. "pcc-node-eu-west-3-7"
+    enclave_type: str | None = None  # "apple-pcc" | "nvidia-h100-cc" | "amd-sev"
 
 
 # ---------------------------------------------------------------------------
 # Provider + response dataclasses
 # ---------------------------------------------------------------------------
+
 
 class LLMProvider(str, Enum):
     """Identifies which backend ultimately served the request."""
@@ -177,6 +179,7 @@ class LLMResponse:
 # Cost tracker (process-wide)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CostTracker:
     """Async-safe accumulator for cost/usage stats across the process."""
@@ -201,7 +204,7 @@ class CostTracker:
             if response.fallback_used:
                 self.total_fallbacks += 1
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         return {
             "requests": self.total_requests,
             "prompt_tokens": self.total_prompt_tokens,
@@ -244,12 +247,12 @@ class LLMClient:
     def __init__(
         self,
         *,
-        router_base: Optional[str] = None,
-        router_key: Optional[str] = None,
-        anthropic_key: Optional[str] = None,
-        openai_key: Optional[str] = None,
-        http_client: Optional[httpx.AsyncClient] = None,
-        confidential: Optional[ConfidentialBackend] = None,
+        router_base: str | None = None,
+        router_key: str | None = None,
+        anthropic_key: str | None = None,
+        openai_key: str | None = None,
+        http_client: httpx.AsyncClient | None = None,
+        confidential: ConfidentialBackend | None = None,
         timeout_seconds: float = 60.0,
         enable_on_device: bool = False,
     ) -> None:
@@ -257,6 +260,7 @@ class LLMClient:
         self._router_key = router_key or CONFIG.router_key
         # Direct-provider keys live outside CONFIG today; pull from env at call sites.
         import os
+
         self._anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY", "")
         self._openai_key = openai_key or os.getenv("OPENAI_API_KEY", "")
         self._timeout = timeout_seconds
@@ -280,7 +284,7 @@ class LLMClient:
         if self._owns_http:
             await self._http.aclose()
 
-    async def __aenter__(self) -> "LLMClient":
+    async def __aenter__(self) -> LLMClient:
         return self
 
     async def __aexit__(self, *_: Any) -> None:
@@ -296,14 +300,14 @@ class LLMClient:
         *,
         model: str,
         max_tokens: int,
-        system: Optional[str] = None,
+        system: str | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
         """
         Run a single completion. Routes through Router by MP first; on failure
         falls back through on-device → Anthropic → OpenAI.
         """
-        attempts: List[Tuple[LLMProvider, Any]] = [
+        attempts: list[tuple[LLMProvider, Any]] = [
             (LLMProvider.ROUTER, self._call_router),
         ]
         if self._enable_on_device:
@@ -311,7 +315,7 @@ class LLMClient:
         attempts.append((LLMProvider.ANTHROPIC, self._call_anthropic))
         attempts.append((LLMProvider.OPENAI, self._call_openai))
 
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for idx, (provider, fn) in enumerate(attempts):
             try:
                 t0 = time.monotonic()
@@ -331,7 +335,8 @@ class LLMClient:
                 last_error = exc
                 logger.warning(
                     "LLM provider %s failed: %s — trying next",
-                    provider.value, exc,
+                    provider.value,
+                    exc,
                 )
 
         raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")
@@ -346,7 +351,7 @@ class LLMClient:
         prompt: str,
         model: str,
         max_tokens: int,
-        system: Optional[str],
+        system: str | None,
         temperature: float,
     ) -> LLMResponse:
         if not self._router_key:
@@ -373,9 +378,7 @@ class LLMClient:
         cache_write = int(usage.get("cache_creation_input_tokens", 0))
 
         content = data["choices"][0]["message"]["content"] or ""
-        cost = _compute_cost_cents(
-            model, prompt_tokens, completion_tokens, cache_read, cache_write
-        )
+        cost = _compute_cost_cents(model, prompt_tokens, completion_tokens, cache_read, cache_write)
         return LLMResponse(
             content=content,
             model=model,
@@ -393,7 +396,7 @@ class LLMClient:
         prompt: str,
         model: str,
         max_tokens: int,
-        system: Optional[str],
+        system: str | None,
         temperature: float,
     ) -> LLMResponse:
         if not self._anthropic_key:
@@ -401,7 +404,7 @@ class LLMClient:
 
         # Anthropic system prompts go in a top-level `system` field; we pass it as
         # an array of blocks so we can attach cache_control on large prompts.
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -439,20 +442,14 @@ class LLMClient:
         data = r.json()
 
         # Anthropic returns content as an array of blocks; concat text blocks.
-        content = "".join(
-            block.get("text", "")
-            for block in data.get("content", [])
-            if block.get("type") == "text"
-        )
+        content = "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text")
         usage = data.get("usage", {}) or {}
         prompt_tokens = int(usage.get("input_tokens", 0))
         completion_tokens = int(usage.get("output_tokens", 0))
         cache_read = int(usage.get("cache_read_input_tokens", 0))
         cache_write = int(usage.get("cache_creation_input_tokens", 0))
 
-        cost = _compute_cost_cents(
-            model, prompt_tokens, completion_tokens, cache_read, cache_write
-        )
+        cost = _compute_cost_cents(model, prompt_tokens, completion_tokens, cache_read, cache_write)
         return LLMResponse(
             content=content,
             model=model,
@@ -470,13 +467,13 @@ class LLMClient:
         prompt: str,
         model: str,
         max_tokens: int,
-        system: Optional[str],
+        system: str | None,
         temperature: float,
     ) -> LLMResponse:
         if not self._openai_key:
             raise RuntimeError("OPENAI_API_KEY not configured")
 
-        messages: List[Dict[str, str]] = []
+        messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
@@ -485,7 +482,7 @@ class LLMClient:
         restricted = any(k in model.lower() for k in ("gpt-5", "o1-", "o3", "o4"))
         token_key = "max_completion_tokens" if restricted else "max_tokens"
 
-        payload: Dict[str, Any] = {"model": model, "messages": messages, token_key: max_tokens}
+        payload: dict[str, Any] = {"model": model, "messages": messages, token_key: max_tokens}
         if not restricted:
             payload["temperature"] = temperature
 
@@ -508,9 +505,7 @@ class LLMClient:
         details = usage.get("prompt_tokens_details", {}) or {}
         cache_read = int(details.get("cached_tokens", 0))
 
-        cost = _compute_cost_cents(
-            model, prompt_tokens, completion_tokens, cache_read, 0
-        )
+        cost = _compute_cost_cents(model, prompt_tokens, completion_tokens, cache_read, 0)
         return LLMResponse(
             content=content,
             model=model,
@@ -527,7 +522,7 @@ class LLMClient:
         prompt: str,
         model: str,
         max_tokens: int,
-        system: Optional[str],
+        system: str | None,
         temperature: float,
     ) -> LLMResponse:
         """

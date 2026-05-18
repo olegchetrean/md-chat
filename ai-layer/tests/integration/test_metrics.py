@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pytest
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -96,8 +95,7 @@ def test_histogram_basic_observation():
 
 
 def _metrics_route_registered(app) -> bool:
-    return any(r.rule == "/metrics" or r.rule == "/api/metrics"
-               for r in app.url_map.iter_rules())
+    return any(r.rule == "/metrics" or r.rule == "/api/metrics" for r in app.url_map.iter_rules())
 
 
 def test_metrics_endpoint_or_skip(client, app):

@@ -38,20 +38,12 @@ class Config:
 
     # MPass / MSign — Moldova government identity (eIDAS-aspiring)
     # AGE = Agentia de Guvernare Electronica (e-Government Agency) onboarding.
-    mpass_sp_entity_id: str = os.getenv(
-        "MPASS_SP_ENTITY_ID", "https://msg.md-chat.eu/saml/sp"
-    )
-    mpass_sp_acs_url: str = os.getenv(
-        "MPASS_SP_ACS_URL", "https://msg.md-chat.eu/api/v1/identity/saml/acs"
-    )
-    mpass_sp_slo_url: str = os.getenv(
-        "MPASS_SP_SLO_URL", "https://msg.md-chat.eu/api/v1/identity/saml/slo"
-    )
+    mpass_sp_entity_id: str = os.getenv("MPASS_SP_ENTITY_ID", "https://msg.md-chat.eu/saml/sp")
+    mpass_sp_acs_url: str = os.getenv("MPASS_SP_ACS_URL", "https://msg.md-chat.eu/api/v1/identity/saml/acs")
+    mpass_sp_slo_url: str = os.getenv("MPASS_SP_SLO_URL", "https://msg.md-chat.eu/api/v1/identity/saml/slo")
     mpass_sp_cert_path: str = os.getenv("MPASS_SP_CERT_PATH", "/etc/md-chat/mpass/sp.crt")
     mpass_sp_key_path: str = os.getenv("MPASS_SP_KEY_PATH", "/etc/md-chat/mpass/sp.key")
-    mpass_idp_metadata_url: str = os.getenv(
-        "MPASS_IDP_METADATA_URL", "https://mpass.gov.md/Metadata"
-    )
+    mpass_idp_metadata_url: str = os.getenv("MPASS_IDP_METADATA_URL", "https://mpass.gov.md/Metadata")
     mpass_idp_metadata_path: str = os.getenv("MPASS_IDP_METADATA_PATH", "")
 
     # Release IDNP only after a second, explicit consent step. GDPR Art 5(1)(c).
@@ -59,17 +51,13 @@ class Config:
 
     # OIDC bridge — issuer URL clients trust.
     oidc_issuer: str = os.getenv("OIDC_ISSUER", "https://msg.md-chat.eu")
-    oidc_signing_key_path: str = os.getenv(
-        "OIDC_SIGNING_KEY_PATH", "/etc/md-chat/oidc/signing.pem"
-    )
+    oidc_signing_key_path: str = os.getenv("OIDC_SIGNING_KEY_PATH", "/etc/md-chat/oidc/signing.pem")
     oidc_signing_kid: str = os.getenv("OIDC_SIGNING_KID", "mpass-bridge-1")
     oidc_id_token_ttl: int = int(os.getenv("OIDC_ID_TOKEN_TTL", "600"))
     oidc_code_ttl: int = int(os.getenv("OIDC_CODE_TTL", "120"))
 
     # MSign SOAP endpoint (qualified signatures).
-    msign_wsdl_url: str = os.getenv(
-        "MSIGN_WSDL_URL", "https://msign.gov.md/services/sign?wsdl"
-    )
+    msign_wsdl_url: str = os.getenv("MSIGN_WSDL_URL", "https://msign.gov.md/services/sign?wsdl")
     msign_client_id: str = os.getenv("MSIGN_CLIENT_ID", "")
     msign_client_secret: str = os.getenv("MSIGN_CLIENT_SECRET", "")
     msign_timeout: int = int(os.getenv("MSIGN_TIMEOUT", "30"))

@@ -30,9 +30,10 @@ messages, promises, mentions)``.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional
+from datetime import datetime
+from typing import Any
 
 from .agent import AI_ACT_DISCLOSURES, ComputeBackend, apply_pii_redaction
 from .templates import Language
@@ -53,10 +54,10 @@ class BriefingContact:
     urgency: int = 0
     sentiment: str = "neutral"
     relevance_score: float = 0.0
-    last_message_date: Optional[str] = None
-    days_silent: Optional[int] = None
+    last_message_date: str | None = None
+    days_silent: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "contact_id": self.contact_id,
             "name": self.name,
@@ -76,11 +77,11 @@ class BriefingPromise:
     text: str
     direction: str
     status: str
-    due_date: Optional[str]
-    days_until_due: Optional[int]
-    created_at: Optional[str] = None
+    due_date: str | None
+    days_until_due: int | None
+    created_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "promise_id": self.promise_id,
             "contact_id": self.contact_id,
@@ -97,19 +98,19 @@ class BriefingPromise:
 class BriefingReport:
     date: str
     generated_at: str
-    summary: Dict[str, Any]
-    likely_inbound: List[BriefingContact] = field(default_factory=list)
-    cooling_relationships: List[BriefingContact] = field(default_factory=list)
-    expiring_promises: List[BriefingPromise] = field(default_factory=list)
-    opportunities_at_risk: List[BriefingContact] = field(default_factory=list)
-    mentions: List[Dict[str, Any]] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
+    summary: dict[str, Any]
+    likely_inbound: list[BriefingContact] = field(default_factory=list)
+    cooling_relationships: list[BriefingContact] = field(default_factory=list)
+    expiring_promises: list[BriefingPromise] = field(default_factory=list)
+    opportunities_at_risk: list[BriefingContact] = field(default_factory=list)
+    mentions: list[dict[str, Any]] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
     language: Language = "ro"
     compute_backend: ComputeBackend = "router_pcc"
     pii_redacted: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date,
             "generated_at": self.generated_at,
@@ -132,7 +133,7 @@ class BriefingReport:
 # ---------------------------------------------------------------------------
 
 
-_HEADINGS: Dict[Language, Dict[str, str]] = {
+_HEADINGS: dict[Language, dict[str, str]] = {
     "ro": {
         "title": "Digest zilnic",
         "summary": "Sumar",
@@ -206,11 +207,11 @@ class DailyBriefing:
 
     def generate(
         self,
-        conversations: Optional[Iterable[Mapping[str, Any]]] = None,
-        promises: Optional[Iterable[Mapping[str, Any]]] = None,
-        mentions: Optional[Iterable[Mapping[str, Any]]] = None,
+        conversations: Iterable[Mapping[str, Any]] | None = None,
+        promises: Iterable[Mapping[str, Any]] | None = None,
+        mentions: Iterable[Mapping[str, Any]] | None = None,
         *,
-        today: Optional[datetime] = None,
+        today: datetime | None = None,
     ) -> BriefingReport:
         """Aggregate the day's data into a BriefingReport.
 
@@ -237,9 +238,7 @@ class DailyBriefing:
         at_risk = self._find_at_risk(convs)
         rendered_mentions = self._render_mentions(ments)
 
-        recommendations = self._fallback_recommendations(
-            likely_inbound, cooling, expiring, at_risk, self.language
-        )
+        recommendations = self._fallback_recommendations(likely_inbound, cooling, expiring, at_risk, self.language)
 
         summary = {
             "total_conversations": len(convs),
@@ -270,11 +269,7 @@ class DailyBriefing:
         # PII redact text-bearing fields
         if self.redact_pii:
             any_red = False
-            for c in (
-                report.likely_inbound
-                + report.cooling_relationships
-                + report.opportunities_at_risk
-            ):
+            for c in report.likely_inbound + report.cooling_relationships + report.opportunities_at_risk:
                 new_reason, did = apply_pii_redaction(c.reason)
                 if did:
                     c.reason = new_reason
@@ -309,7 +304,7 @@ class DailyBriefing:
             return 0
 
     @staticmethod
-    def _parse_date(value: Any) -> Optional[datetime]:
+    def _parse_date(value: Any) -> datetime | None:
         if not value:
             return None
         s = str(value)[:19]
@@ -324,26 +319,28 @@ class DailyBriefing:
         except ValueError:
             return None
 
-    def _find_likely_inbound(self, convs: List[Mapping[str, Any]]) -> List[BriefingContact]:
-        out: List[BriefingContact] = []
+    def _find_likely_inbound(self, convs: list[Mapping[str, Any]]) -> list[BriefingContact]:
+        out: list[BriefingContact] = []
         for c in convs:
             urgency = self._coerce_urgency(c.get("urgency", c.get("ai_urgency", 0)))
             if urgency < self.INBOUND_URGENCY:
                 continue
-            out.append(BriefingContact(
-                contact_id=str(c.get("id", c.get("contact_id", ""))),
-                name=str(c.get("name", "Unknown")),
-                reason=f"High urgency ({urgency}) — likely to initiate contact today",
-                urgency=urgency,
-                sentiment=str(c.get("sentiment", c.get("ai_sentiment", "neutral"))),
-                relevance_score=float(c.get("relevance_score", 0.0)),
-                last_message_date=c.get("last_message_date"),
-            ))
+            out.append(
+                BriefingContact(
+                    contact_id=str(c.get("id", c.get("contact_id", ""))),
+                    name=str(c.get("name", "Unknown")),
+                    reason=f"High urgency ({urgency}) — likely to initiate contact today",
+                    urgency=urgency,
+                    sentiment=str(c.get("sentiment", c.get("ai_sentiment", "neutral"))),
+                    relevance_score=float(c.get("relevance_score", 0.0)),
+                    last_message_date=c.get("last_message_date"),
+                )
+            )
         out.sort(key=lambda x: -x.urgency)
         return out[:10]
 
-    def _find_cooling(self, convs: List[Mapping[str, Any]], today_date) -> List[BriefingContact]:
-        out: List[BriefingContact] = []
+    def _find_cooling(self, convs: list[Mapping[str, Any]], today_date) -> list[BriefingContact]:
+        out: list[BriefingContact] = []
         for c in convs:
             rel = float(c.get("relevance_score", 0.0))
             if rel < self.COOLING_MIN_RELEVANCE:
@@ -354,23 +351,23 @@ class DailyBriefing:
             days_silent = (today_date - last.date()).days
             if days_silent < self.COOLING_DAYS:
                 continue
-            out.append(BriefingContact(
-                contact_id=str(c.get("id", c.get("contact_id", ""))),
-                name=str(c.get("name", "Unknown")),
-                reason=f"No contact for {days_silent} days (relevance {rel:.0f})",
-                urgency=self._coerce_urgency(c.get("urgency", c.get("ai_urgency", 0))),
-                sentiment=str(c.get("sentiment", c.get("ai_sentiment", "neutral"))),
-                relevance_score=rel,
-                last_message_date=c.get("last_message_date"),
-                days_silent=days_silent,
-            ))
+            out.append(
+                BriefingContact(
+                    contact_id=str(c.get("id", c.get("contact_id", ""))),
+                    name=str(c.get("name", "Unknown")),
+                    reason=f"No contact for {days_silent} days (relevance {rel:.0f})",
+                    urgency=self._coerce_urgency(c.get("urgency", c.get("ai_urgency", 0))),
+                    sentiment=str(c.get("sentiment", c.get("ai_sentiment", "neutral"))),
+                    relevance_score=rel,
+                    last_message_date=c.get("last_message_date"),
+                    days_silent=days_silent,
+                )
+            )
         out.sort(key=lambda x: -(x.days_silent or 0))
         return out[:10]
 
-    def _find_expiring_promises(
-        self, proms: List[Mapping[str, Any]], today_date
-    ) -> List[BriefingPromise]:
-        out: List[BriefingPromise] = []
+    def _find_expiring_promises(self, proms: list[Mapping[str, Any]], today_date) -> list[BriefingPromise]:
+        out: list[BriefingPromise] = []
         deadline_days = self.EXPIRING_PROMISE_DAYS
 
         for p in proms:
@@ -378,28 +375,30 @@ class DailyBriefing:
             if status not in ("pending", "neindeplinita", "open"):
                 continue
             due = p.get("due_date")
-            days_until: Optional[int] = None
+            days_until: int | None = None
             if due:
                 due_dt = self._parse_date(due)
                 if due_dt:
                     days_until = (due_dt.date() - today_date).days
                     if days_until > deadline_days:
                         continue
-            out.append(BriefingPromise(
-                promise_id=str(p.get("id", "")),
-                contact_id=str(p.get("contact_id", "")),
-                text=str(p.get("text", "")),
-                direction=str(p.get("direction", "")),
-                status=status,
-                due_date=str(due) if due else None,
-                days_until_due=days_until,
-                created_at=p.get("created_at"),
-            ))
+            out.append(
+                BriefingPromise(
+                    promise_id=str(p.get("id", "")),
+                    contact_id=str(p.get("contact_id", "")),
+                    text=str(p.get("text", "")),
+                    direction=str(p.get("direction", "")),
+                    status=status,
+                    due_date=str(due) if due else None,
+                    days_until_due=days_until,
+                    created_at=p.get("created_at"),
+                )
+            )
         out.sort(key=lambda x: (x.days_until_due is None, x.days_until_due or 999))
         return out[:15]
 
-    def _find_at_risk(self, convs: List[Mapping[str, Any]]) -> List[BriefingContact]:
-        out: List[BriefingContact] = []
+    def _find_at_risk(self, convs: list[Mapping[str, Any]]) -> list[BriefingContact]:
+        out: list[BriefingContact] = []
         for c in convs:
             sentiment = str(c.get("sentiment", c.get("ai_sentiment", ""))).lower()
             if sentiment not in ("negative", "critical", "mixed"):
@@ -407,34 +406,38 @@ class DailyBriefing:
             rel = float(c.get("relevance_score", 0.0))
             if rel < 30:
                 continue
-            out.append(BriefingContact(
-                contact_id=str(c.get("id", c.get("contact_id", ""))),
-                name=str(c.get("name", "Unknown")),
-                reason=f"Negative sentiment ({sentiment}) with relevance {rel:.0f}",
-                urgency=self._coerce_urgency(c.get("urgency", c.get("ai_urgency", 0))),
-                sentiment=sentiment,
-                relevance_score=rel,
-                last_message_date=c.get("last_message_date"),
-            ))
+            out.append(
+                BriefingContact(
+                    contact_id=str(c.get("id", c.get("contact_id", ""))),
+                    name=str(c.get("name", "Unknown")),
+                    reason=f"Negative sentiment ({sentiment}) with relevance {rel:.0f}",
+                    urgency=self._coerce_urgency(c.get("urgency", c.get("ai_urgency", 0))),
+                    sentiment=sentiment,
+                    relevance_score=rel,
+                    last_message_date=c.get("last_message_date"),
+                )
+            )
         out.sort(key=lambda x: -x.relevance_score)
         return out[:10]
 
-    def _render_mentions(self, mentions: List[Mapping[str, Any]]) -> List[Dict[str, Any]]:
-        rendered: List[Dict[str, Any]] = []
+    def _render_mentions(self, mentions: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        rendered: list[dict[str, Any]] = []
         for m in mentions:
-            rendered.append({
-                "room": str(m.get("room", "")),
-                "sender": str(m.get("sender", "")),
-                "text": str(m.get("text", ""))[:300],
-                "timestamp": m.get("timestamp"),
-            })
+            rendered.append(
+                {
+                    "room": str(m.get("room", "")),
+                    "sender": str(m.get("sender", "")),
+                    "text": str(m.get("text", ""))[:300],
+                    "timestamp": m.get("timestamp"),
+                }
+            )
         return rendered[:20]
 
     # ------------------------------------------------------------------
     # Recommendations (rule-based, language-aware)
     # ------------------------------------------------------------------
 
-    _REC_TEMPLATES: Dict[Language, Dict[str, str]] = {
+    _REC_TEMPLATES: dict[Language, dict[str, str]] = {
         "ro": {
             "inbound": "Pregateste-te pentru un mesaj de la {name} (urgenta detectata).",
             "cooling": "Reactiveaza relatia cu {name} — {days} zile fara contact.",
@@ -466,14 +469,14 @@ class DailyBriefing:
 
     def _fallback_recommendations(
         self,
-        likely_inbound: List[BriefingContact],
-        cooling: List[BriefingContact],
-        expiring: List[BriefingPromise],
-        at_risk: List[BriefingContact],
+        likely_inbound: list[BriefingContact],
+        cooling: list[BriefingContact],
+        expiring: list[BriefingPromise],
+        at_risk: list[BriefingContact],
         language: Language,
-    ) -> List[str]:
+    ) -> list[str]:
         t = self._REC_TEMPLATES.get(language, self._REC_TEMPLATES["en"])
-        recs: List[str] = []
+        recs: list[str] = []
 
         if likely_inbound:
             recs.append(t["inbound"].format(name=likely_inbound[0].name))
@@ -500,18 +503,14 @@ class DailyBriefing:
     def format_short(self, report: BriefingReport, *, max_chars: int = 500) -> str:
         """3 bullet points compact, e.g. for Telegram/Synapse push notification."""
         lang = report.language
-        bullets: List[str] = []
+        bullets: list[str] = []
 
         if report.likely_inbound:
             top = report.likely_inbound[0]
             bullets.append(f"{_h(lang, 'inbound')}: {top.name} (urgency {top.urgency})")
         if report.expiring_promises:
             p = report.expiring_promises[0]
-            due = (
-                f"in {p.days_until_due}d"
-                if p.days_until_due is not None and p.days_until_due >= 0
-                else "overdue"
-            )
+            due = f"in {p.days_until_due}d" if p.days_until_due is not None and p.days_until_due >= 0 else "overdue"
             bullets.append(f"{_h(lang, 'promises')}: {p.text[:60]} ({due})")
         if report.opportunities_at_risk:
             c = report.opportunities_at_risk[0]
@@ -532,7 +531,7 @@ class DailyBriefing:
         """Full Markdown briefing with AI Act disclosure footer."""
         lang = report.language
         h = lambda k: _h(lang, k)  # noqa: E731
-        lines: List[str] = [
+        lines: list[str] = [
             f"# {h('title')} — {report.date}",
             "",
             f"*{h('generated')}: {report.generated_at}*",
@@ -542,10 +541,7 @@ class DailyBriefing:
 
         s = report.summary
         lines.append(f"## {h('summary')}")
-        lines.append(
-            f"- Conversations: {s.get('total_conversations', 0)} | "
-            f"Mentions: {s.get('mentions_count', 0)}"
-        )
+        lines.append(f"- Conversations: {s.get('total_conversations', 0)} | " f"Mentions: {s.get('mentions_count', 0)}")
         lines.append(
             f"- Inbound likely: **{s.get('likely_inbound_count', 0)}** | "
             f"Cooling: **{s.get('cooling_count', 0)}** | "
@@ -569,18 +565,14 @@ class DailyBriefing:
         if report.cooling_relationships:
             lines.append(f"## {h('cooling')}")
             for c in report.cooling_relationships:
-                lines.append(
-                    f"- **{c.name}** — {c.days_silent}d, relevance {c.relevance_score:.0f}"
-                )
+                lines.append(f"- **{c.name}** — {c.days_silent}d, relevance {c.relevance_score:.0f}")
             lines.append("")
 
         if report.expiring_promises:
             lines.append(f"## {h('promises')}")
             for p in report.expiring_promises:
                 due_str = (
-                    f"in {p.days_until_due}d"
-                    if p.days_until_due is not None and p.days_until_due >= 0
-                    else "overdue"
+                    f"in {p.days_until_due}d" if p.days_until_due is not None and p.days_until_due >= 0 else "overdue"
                 )
                 lines.append(f"- [{p.direction.upper() or 'N/A'}] {p.text[:120]} — {due_str}")
             lines.append("")
@@ -594,9 +586,7 @@ class DailyBriefing:
         if report.mentions:
             lines.append(f"## {h('mentions')}")
             for m in report.mentions[:10]:
-                lines.append(
-                    f"- *{m.get('room', '?')}* by `{m.get('sender', '?')}`: {m.get('text', '')[:140]}"
-                )
+                lines.append(f"- *{m.get('room', '?')}* by `{m.get('sender', '?')}`: {m.get('text', '')[:140]}")
             lines.append("")
 
         if report.error:

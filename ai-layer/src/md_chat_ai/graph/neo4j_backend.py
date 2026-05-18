@@ -51,7 +51,8 @@ import json
 import logging
 import uuid as _uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from datetime import UTC
+from typing import Any
 
 from ..config import CONFIG
 from .ontology import CONSENT_TIERS, normalise_consent_tier
@@ -82,14 +83,14 @@ class EntityNode:
 
     uuid: str
     name: str
-    labels: List[str]
+    labels: list[str]
     summary: str
-    attributes: Dict[str, Any]
+    attributes: dict[str, Any]
     consent_tier: str = "private"
-    related_edges: List[Dict[str, Any]] = field(default_factory=list)
-    related_nodes: List[Dict[str, Any]] = field(default_factory=list)
+    related_edges: list[dict[str, Any]] = field(default_factory=list)
+    related_nodes: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "uuid": self.uuid,
             "name": self.name,
@@ -101,7 +102,7 @@ class EntityNode:
             "related_nodes": self.related_nodes,
         }
 
-    def get_entity_type(self) -> Optional[str]:
+    def get_entity_type(self) -> str | None:
         """Return the first non-system label, i.e. the MD-Chat entity type."""
         system = {"Entity", "Node"}
         for label in self.labels:
@@ -119,11 +120,11 @@ class Edge:
     fact: str
     source_node_uuid: str
     target_node_uuid: str
-    attributes: Dict[str, Any]
+    attributes: dict[str, Any]
     consent_tier: str = "private"
     created_at: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "uuid": self.uuid,
             "name": self.name,
@@ -145,11 +146,11 @@ class SearchResult:
     entity_type: str
     summary: str
     score: float
-    attributes: Dict[str, Any]
+    attributes: dict[str, Any]
     consent_tier: str = "private"
-    matched_edges: List[Dict[str, Any]] = field(default_factory=list)
+    matched_edges: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "uuid": self.uuid,
             "name": self.name,
@@ -172,9 +173,7 @@ def _get_driver(uri: str, user: str, password: str):
     try:
         from neo4j import GraphDatabase  # type: ignore
     except ImportError as exc:  # pragma: no cover - import guard
-        raise ImportError(
-            "neo4j package not found. Install it: pip install neo4j"
-        ) from exc
+        raise ImportError("neo4j package not found. Install it: pip install neo4j") from exc
     return GraphDatabase.driver(uri, auth=(user, password))
 
 
@@ -184,8 +183,7 @@ def _get_embedding_model(model_name: str):
         from sentence_transformers import SentenceTransformer  # type: ignore
     except ImportError as exc:  # pragma: no cover - import guard
         raise ImportError(
-            "sentence-transformers package not found. "
-            "Install it: pip install sentence-transformers"
+            "sentence-transformers package not found. " "Install it: pip install sentence-transformers"
         ) from exc
     return SentenceTransformer(model_name)
 
@@ -209,26 +207,21 @@ class Neo4jGraphBackend:
 
     # Cypher to create constraints and indexes on first use
     _SETUP_CYPHER = [
-        "CREATE CONSTRAINT mdchat_entity_id IF NOT EXISTS "
-        "FOR (e:Entity) REQUIRE e.entity_id IS UNIQUE",
-        "CREATE CONSTRAINT mdchat_graph_id IF NOT EXISTS "
-        "FOR (g:Graph) REQUIRE g.graph_id IS UNIQUE",
-        "CREATE INDEX mdchat_entity_graph IF NOT EXISTS "
-        "FOR (e:Entity) ON (e.graph_id)",
-        "CREATE INDEX mdchat_entity_consent IF NOT EXISTS "
-        "FOR (e:Entity) ON (e.consent_tier)",
-        "CREATE INDEX mdchat_edge_graph IF NOT EXISTS "
-        "FOR ()-[r:EDGE]-() ON (r.graph_id)",
+        "CREATE CONSTRAINT mdchat_entity_id IF NOT EXISTS " "FOR (e:Entity) REQUIRE e.entity_id IS UNIQUE",
+        "CREATE CONSTRAINT mdchat_graph_id IF NOT EXISTS " "FOR (g:Graph) REQUIRE g.graph_id IS UNIQUE",
+        "CREATE INDEX mdchat_entity_graph IF NOT EXISTS " "FOR (e:Entity) ON (e.graph_id)",
+        "CREATE INDEX mdchat_entity_consent IF NOT EXISTS " "FOR (e:Entity) ON (e.consent_tier)",
+        "CREATE INDEX mdchat_edge_graph IF NOT EXISTS " "FOR ()-[r:EDGE]-() ON (r.graph_id)",
     ]
 
     def __init__(
         self,
-        uri: Optional[str] = None,
-        user: Optional[str] = None,
-        password: Optional[str] = None,
+        uri: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
         embedding_model: str = "all-MiniLM-L6-v2",
         database: str = "neo4j",
-        driver: Optional[Any] = None,
+        driver: Any | None = None,
     ) -> None:
         """
         Initialise the backend and verify connectivity.
@@ -261,8 +254,7 @@ class Neo4jGraphBackend:
 
         self._setup_schema()
         logger.info(
-            f"Neo4jGraphBackend initialised: uri={self.uri}, db={database}, "
-            f"embedding_model={embedding_model}"
+            f"Neo4jGraphBackend initialised: uri={self.uri}, db={database}, " f"embedding_model={embedding_model}"
         )
 
     # ------------------------------------------------------------------
@@ -288,23 +280,24 @@ class Neo4jGraphBackend:
             self._embed_model = _get_embedding_model(self.embedding_model_name)
         return self._embed_model
 
-    def _embed(self, text: str) -> List[float]:
+    def _embed(self, text: str) -> list[float]:
         """Embed a single string, returning a list of floats."""
         model = self._get_embed_model()
         vector = model.encode(text, normalize_embeddings=True)
         return vector.tolist()
 
-    def _embed_batch(self, texts: List[str]) -> List[List[float]]:
+    def _embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Embed a list of strings in one batch call."""
         model = self._get_embed_model()
         vectors = model.encode(texts, normalize_embeddings=True, batch_size=32)
         return [v.tolist() for v in vectors]
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         """Pure-Python cosine similarity (numpy fast-path if available)."""
         try:
             import numpy as np  # type: ignore
+
             return float(np.dot(a, b))
         except ImportError:
             return sum(x * y for x, y in zip(a, b))
@@ -315,21 +308,22 @@ class Neo4jGraphBackend:
 
     @staticmethod
     def _now_iso() -> str:
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc).isoformat()
+        from datetime import datetime
+
+        return datetime.now(UTC).isoformat()
 
     @staticmethod
     def _new_id() -> str:
         return _uuid.uuid4().hex
 
-    def _run(self, cypher: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
+    def _run(self, cypher: str, params: dict[str, Any] | None = None) -> list[Any]:
         """Execute a Cypher query and return all records."""
         with self._driver.session(database=self.database) as session:
             result = session.run(cypher, params or {})
             return list(result)
 
     @staticmethod
-    def _decode_attrs(attrs_json: Optional[str]) -> Dict[str, Any]:
+    def _decode_attrs(attrs_json: str | None) -> dict[str, Any]:
         if not attrs_json:
             return {}
         try:
@@ -338,11 +332,11 @@ class Neo4jGraphBackend:
             return {}
 
     @staticmethod
-    def _encode_attrs(attrs: Dict[str, Any]) -> str:
+    def _encode_attrs(attrs: dict[str, Any]) -> str:
         return json.dumps(attrs or {}, ensure_ascii=False)
 
     @staticmethod
-    def _resolve_tier(consent_tier: Optional[str]) -> str:
+    def _resolve_tier(consent_tier: str | None) -> str:
         """Normalise a tier value, falling back to the most restrictive default."""
         return normalise_consent_tier(consent_tier, default="private")
 
@@ -375,20 +369,23 @@ class Neo4jGraphBackend:
             g.created_at  = $created_at
         RETURN g.graph_id AS gid
         """
-        self._run(cypher, {
-            "graph_id": graph_id,
-            "name": name,
-            "description": description,
-            "created_at": self._now_iso(),
-        })
+        self._run(
+            cypher,
+            {
+                "graph_id": graph_id,
+                "name": name,
+                "description": description,
+                "created_at": self._now_iso(),
+            },
+        )
         logger.info(f"Neo4j: created graph {graph_id!r} ({name!r})")
         return graph_id
 
     async def set_ontology(
         self,
         graph_id: str,
-        entity_types: List[Dict[str, Any]],
-        edge_types: List[Dict[str, Any]],
+        entity_types: list[dict[str, Any]],
+        edge_types: list[dict[str, Any]],
     ) -> None:
         """
         Persist ontology metadata on the Graph node as JSON.
@@ -403,10 +400,13 @@ class Neo4jGraphBackend:
         MATCH (g:Graph {graph_id: $graph_id})
         SET g.ontology_json = $ontology_json
         """
-        self._run(cypher, {
-            "graph_id": graph_id,
-            "ontology_json": json.dumps(ontology),
-        })
+        self._run(
+            cypher,
+            {
+                "graph_id": graph_id,
+                "ontology_json": json.dumps(ontology),
+            },
+        )
         logger.info(
             f"Neo4j: ontology set for graph {graph_id}: "
             f"{len(entity_types)} entity types, {len(edge_types)} edge types"
@@ -416,8 +416,8 @@ class Neo4jGraphBackend:
         self,
         graph_id: str,
         limit: int = 1000,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> List[EntityNode]:
+        consent_tiers: list[str] | None = None,
+    ) -> list[EntityNode]:
         """
         Return all Entity nodes in the graph, optionally filtered by consent tier.
 
@@ -438,7 +438,7 @@ class Neo4jGraphBackend:
             ORDER BY e.created_at
             LIMIT $limit
             """
-            params: Dict[str, Any] = {
+            params: dict[str, Any] = {
                 "graph_id": graph_id,
                 "tiers": consent_tiers,
                 "limit": limit,
@@ -453,30 +453,28 @@ class Neo4jGraphBackend:
             params = {"graph_id": graph_id, "limit": limit}
 
         records = self._run(cypher, params)
-        nodes: List[EntityNode] = []
+        nodes: list[EntityNode] = []
         for rec in records:
             e = rec["e"]
             entity_type = e.get("entity_type", "Entity") if hasattr(e, "get") else "Entity"
-            nodes.append(EntityNode(
-                uuid=e.get("entity_id", "") if hasattr(e, "get") else "",
-                name=e.get("name", "") if hasattr(e, "get") else "",
-                labels=["Entity", entity_type] if entity_type != "Entity" else ["Entity"],
-                summary=e.get("summary", "") if hasattr(e, "get") else "",
-                attributes=self._decode_attrs(
-                    e.get("attributes_json") if hasattr(e, "get") else None
-                ),
-                consent_tier=self._resolve_tier(
-                    e.get("consent_tier") if hasattr(e, "get") else None
-                ),
-            ))
+            nodes.append(
+                EntityNode(
+                    uuid=e.get("entity_id", "") if hasattr(e, "get") else "",
+                    name=e.get("name", "") if hasattr(e, "get") else "",
+                    labels=["Entity", entity_type] if entity_type != "Entity" else ["Entity"],
+                    summary=e.get("summary", "") if hasattr(e, "get") else "",
+                    attributes=self._decode_attrs(e.get("attributes_json") if hasattr(e, "get") else None),
+                    consent_tier=self._resolve_tier(e.get("consent_tier") if hasattr(e, "get") else None),
+                )
+            )
         return nodes
 
     async def get_edges(
         self,
         graph_id: str,
         limit: int = 1000,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> List[Edge]:
+        consent_tiers: list[str] | None = None,
+    ) -> list[Edge]:
         """
         Return all edges in the graph, optionally filtered by consent tier.
 
@@ -497,7 +495,7 @@ class Neo4jGraphBackend:
             ORDER BY r.created_at
             LIMIT $limit
             """
-            params: Dict[str, Any] = {
+            params: dict[str, Any] = {
                 "graph_id": graph_id,
                 "tiers": consent_tiers,
                 "limit": limit,
@@ -513,23 +511,21 @@ class Neo4jGraphBackend:
             params = {"graph_id": graph_id, "limit": limit}
 
         records = self._run(cypher, params)
-        edges: List[Edge] = []
+        edges: list[Edge] = []
         for rec in records:
             r = rec["r"]
-            edges.append(Edge(
-                uuid=r.get("edge_id", "") if hasattr(r, "get") else "",
-                name=r.get("edge_type", "") if hasattr(r, "get") else "",
-                fact=r.get("fact", "") if hasattr(r, "get") else "",
-                source_node_uuid=rec["src_id"],
-                target_node_uuid=rec["tgt_id"],
-                attributes=self._decode_attrs(
-                    r.get("attributes_json") if hasattr(r, "get") else None
-                ),
-                consent_tier=self._resolve_tier(
-                    r.get("consent_tier") if hasattr(r, "get") else None
-                ),
-                created_at=r.get("created_at", "") if hasattr(r, "get") else "",
-            ))
+            edges.append(
+                Edge(
+                    uuid=r.get("edge_id", "") if hasattr(r, "get") else "",
+                    name=r.get("edge_type", "") if hasattr(r, "get") else "",
+                    fact=r.get("fact", "") if hasattr(r, "get") else "",
+                    source_node_uuid=rec["src_id"],
+                    target_node_uuid=rec["tgt_id"],
+                    attributes=self._decode_attrs(r.get("attributes_json") if hasattr(r, "get") else None),
+                    consent_tier=self._resolve_tier(r.get("consent_tier") if hasattr(r, "get") else None),
+                    created_at=r.get("created_at", "") if hasattr(r, "get") else "",
+                )
+            )
         return edges
 
     async def search(
@@ -537,8 +533,8 @@ class Neo4jGraphBackend:
         graph_id: str,
         query: str,
         limit: int = 10,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> List[SearchResult]:
+        consent_tiers: list[str] | None = None,
+    ) -> list[SearchResult]:
         """
         Search entities by semantic similarity + keyword fallback.
 
@@ -566,7 +562,7 @@ class Neo4jGraphBackend:
                    e.embedding_json AS emb_json,
                    e.consent_tier AS tier
             """
-            params: Dict[str, Any] = {"graph_id": graph_id, "tiers": consent_tiers}
+            params: dict[str, Any] = {"graph_id": graph_id, "tiers": consent_tiers}
         else:
             cypher = """
             MATCH (e:Entity {graph_id: $graph_id})
@@ -583,7 +579,7 @@ class Neo4jGraphBackend:
 
         records = self._run(cypher, params)
 
-        scored: List[tuple] = []
+        scored: list[tuple] = []
         for rec in records:
             emb_json = rec["emb_json"]
             if not emb_json:
@@ -597,28 +593,26 @@ class Neo4jGraphBackend:
 
             name_lower = (rec["name"] or "").lower()
             summary_lower = (rec["summary"] or "").lower()
-            kw_boost = sum(
-                0.05
-                for word in query_lower.split()
-                if word in name_lower or word in summary_lower
-            )
+            kw_boost = sum(0.05 for word in query_lower.split() if word in name_lower or word in summary_lower)
             score = cosine + kw_boost
             scored.append((score, rec))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         top = scored[:limit]
 
-        results: List[SearchResult] = []
+        results: list[SearchResult] = []
         for score, rec in top:
-            results.append(SearchResult(
-                uuid=rec["eid"],
-                name=rec["name"] or "",
-                entity_type=rec["etype"] or "Entity",
-                summary=rec["summary"] or "",
-                score=round(score, 6),
-                attributes=self._decode_attrs(rec["attrs_json"]),
-                consent_tier=self._resolve_tier(rec.get("tier") if hasattr(rec, "get") else None),
-            ))
+            results.append(
+                SearchResult(
+                    uuid=rec["eid"],
+                    name=rec["name"] or "",
+                    entity_type=rec["etype"] or "Entity",
+                    summary=rec["summary"] or "",
+                    score=round(score, 6),
+                    attributes=self._decode_attrs(rec["attrs_json"]),
+                    consent_tier=self._resolve_tier(rec.get("tier") if hasattr(rec, "get") else None),
+                )
+            )
         return results
 
     async def delete_graph(self, graph_id: str) -> None:
@@ -656,7 +650,7 @@ class Neo4jGraphBackend:
         name: str,
         entity_type: str,
         summary: str = "",
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
         consent_tier: str = "private",
     ) -> str:
         """
@@ -705,21 +699,22 @@ class Neo4jGraphBackend:
         MERGE (e)-[:IN_GRAPH]->(g)
         RETURN e.entity_id AS eid
         """
-        records = self._run(cypher, {
-            "graph_id": graph_id,
-            "entity_id": entity_id,
-            "name": name,
-            "entity_type": entity_type,
-            "summary": summary,
-            "attrs_json": self._encode_attrs(attributes or {}),
-            "embedding_json": json.dumps(embedding),
-            "consent_tier": tier,
-            "created_at": now,
-        })
-        eid = records[0]["eid"] if records else entity_id
-        logger.debug(
-            f"Neo4j: add_entity name={name!r} type={entity_type} tier={tier} eid={eid}"
+        records = self._run(
+            cypher,
+            {
+                "graph_id": graph_id,
+                "entity_id": entity_id,
+                "name": name,
+                "entity_type": entity_type,
+                "summary": summary,
+                "attrs_json": self._encode_attrs(attributes or {}),
+                "embedding_json": json.dumps(embedding),
+                "consent_tier": tier,
+                "created_at": now,
+            },
         )
+        eid = records[0]["eid"] if records else entity_id
+        logger.debug(f"Neo4j: add_entity name={name!r} type={entity_type} tier={tier} eid={eid}")
         return eid
 
     async def add_edge(
@@ -729,7 +724,7 @@ class Neo4jGraphBackend:
         target: str,
         edge_type: str,
         fact: str = "",
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
         consent_tier: str = "private",
     ) -> str:
         """
@@ -785,30 +780,31 @@ class Neo4jGraphBackend:
         MERGE (tgt)-[:IN_GRAPH]->(g)
         RETURN r.edge_id AS rid
         """
-        records = self._run(cypher, {
-            "graph_id": graph_id,
-            "source": source,
-            "target": target,
-            "src_id": self._new_id(),
-            "tgt_id": self._new_id(),
-            "edge_type": edge_type,
-            "edge_id": edge_id,
-            "fact": fact,
-            "attrs_json": self._encode_attrs(attributes or {}),
-            "tier": tier,
-            "now": now,
-        })
-        rid = records[0]["rid"] if records else edge_id
-        logger.debug(
-            f"Neo4j: add_edge {source!r} -[{edge_type}]-> {target!r} tier={tier} rid={rid}"
+        records = self._run(
+            cypher,
+            {
+                "graph_id": graph_id,
+                "source": source,
+                "target": target,
+                "src_id": self._new_id(),
+                "tgt_id": self._new_id(),
+                "edge_type": edge_type,
+                "edge_id": edge_id,
+                "fact": fact,
+                "attrs_json": self._encode_attrs(attributes or {}),
+                "tier": tier,
+                "now": now,
+            },
         )
+        rid = records[0]["rid"] if records else edge_id
+        logger.debug(f"Neo4j: add_edge {source!r} -[{edge_type}]-> {target!r} tier={tier} rid={rid}")
         return rid
 
     async def update_entity(
         self,
         graph_id: str,
         entity_id: str,
-        updates: Dict[str, Any],
+        updates: dict[str, Any],
     ) -> bool:
         """
         Update properties of an existing entity node.
@@ -838,12 +834,8 @@ class Neo4jGraphBackend:
         new_name = updates.get("name", current["name"])
         new_summary = updates.get("summary", current["summary"] or "")
         new_etype = updates.get("entity_type", current["etype"] or "Entity")
-        new_attrs = updates.get(
-            "attributes", self._decode_attrs(current["attrs_json"])
-        )
-        new_tier = self._resolve_tier(
-            updates.get("consent_tier", current["tier"])
-        )
+        new_attrs = updates.get("attributes", self._decode_attrs(current["attrs_json"]))
+        new_tier = self._resolve_tier(updates.get("consent_tier", current["tier"]))
 
         embedding = self._embed(f"{new_name} {new_summary}")
         now = self._now_iso()
@@ -859,25 +851,26 @@ class Neo4jGraphBackend:
             e.updated_at      = $updated_at
         RETURN e.entity_id AS eid
         """
-        result = self._run(update_cypher, {
-            "graph_id": graph_id,
-            "entity_id": entity_id,
-            "name": new_name,
-            "etype": new_etype,
-            "summary": new_summary,
-            "attrs_json": self._encode_attrs(new_attrs),
-            "embedding_json": json.dumps(embedding),
-            "consent_tier": new_tier,
-            "updated_at": now,
-        })
+        result = self._run(
+            update_cypher,
+            {
+                "graph_id": graph_id,
+                "entity_id": entity_id,
+                "name": new_name,
+                "etype": new_etype,
+                "summary": new_summary,
+                "attrs_json": self._encode_attrs(new_attrs),
+                "embedding_json": json.dumps(embedding),
+                "consent_tier": new_tier,
+                "updated_at": now,
+            },
+        )
         ok = bool(result)
         if ok:
             logger.debug(f"Neo4j: updated entity {entity_id}")
         return ok
 
-    async def delete_entity(
-        self, graph_id: str, entity_id: str
-    ) -> bool:
+    async def delete_entity(self, graph_id: str, entity_id: str) -> bool:
         """Delete an entity node and all its incident edges."""
         cypher = """
         MATCH (e:Entity {graph_id: $graph_id, entity_id: $entity_id})
@@ -899,7 +892,7 @@ class Neo4jGraphBackend:
         self._driver.close()
         logger.info("Neo4j driver closed")
 
-    def get_graph_stats(self, graph_id: str) -> Dict[str, Any]:
+    def get_graph_stats(self, graph_id: str) -> dict[str, Any]:
         """
         Return basic statistics for a graph.
 
@@ -920,8 +913,8 @@ class Neo4jGraphBackend:
         node_rows = self._run(node_cypher, {"graph_id": graph_id})
         edge_rows = self._run(edge_cypher, {"graph_id": graph_id})
 
-        entity_types: Dict[str, int] = {}
-        consent_breakdown: Dict[str, int] = {t: 0 for t in CONSENT_TIERS}
+        entity_types: dict[str, int] = {}
+        consent_breakdown: dict[str, int] = {t: 0 for t in CONSENT_TIERS}
         total_nodes = 0
         for row in node_rows:
             etype = row["etype"] or "Entity"
@@ -942,7 +935,4 @@ class Neo4jGraphBackend:
         }
 
     def __repr__(self) -> str:
-        return (
-            f"Neo4jGraphBackend(uri={self.uri!r}, db={self.database!r}, "
-            f"embedding={self.embedding_model_name!r})"
-        )
+        return f"Neo4jGraphBackend(uri={self.uri!r}, db={self.database!r}, " f"embedding={self.embedding_model_name!r})"

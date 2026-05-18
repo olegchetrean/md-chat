@@ -14,7 +14,6 @@ import pytest
 from md_chat_ai.auth import phone_verification as pv
 from md_chat_ai.auth import pin_backup, totp_mfa
 
-
 # ---------------------------------------------------------------------------
 # E.164 normalization.
 # ---------------------------------------------------------------------------
@@ -98,9 +97,7 @@ def test_hourly_cap_enforced():
         res = asyncio.run(_send_no_sms(store, t=1000.0 + i * (pv.COOLDOWN_SECONDS + 1)))
         assert res.error == "sms_provider_not_configured"
     # 6th should hit hourly cap (well after cooldown).
-    res = asyncio.run(
-        _send_no_sms(store, t=1000.0 + pv.MAX_PER_HOUR * (pv.COOLDOWN_SECONDS + 1))
-    )
+    res = asyncio.run(_send_no_sms(store, t=1000.0 + pv.MAX_PER_HOUR * (pv.COOLDOWN_SECONDS + 1)))
     assert res.ok is False
     assert res.error == "too_many_requests"
 

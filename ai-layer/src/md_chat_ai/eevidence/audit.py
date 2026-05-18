@@ -26,7 +26,7 @@ import hashlib
 import json
 import threading
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 # Sentinel used as the previous hash for the very first entry of a register.
@@ -36,7 +36,7 @@ _GENESIS_HASH = "0" * 64
 def _utcnow_iso() -> str:
     """Wall-clock UTC timestamp in ISO-8601 with millisecond precision."""
 
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
 def _stable_hash(payload: dict[str, Any], previous_hash: str) -> str:

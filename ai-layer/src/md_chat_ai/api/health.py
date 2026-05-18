@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flask import Blueprint, jsonify
 
@@ -19,7 +19,7 @@ def health():
             "status": "healthy",
             "service": "md-chat-ai",
             "version": __version__,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "config": {
                 "neo4j_configured": bool(CONFIG.neo4j_password),
                 "router_configured": bool(CONFIG.router_key),

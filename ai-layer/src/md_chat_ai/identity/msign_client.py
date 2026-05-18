@@ -20,8 +20,9 @@ from __future__ import annotations
 
 import base64
 import logging
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -73,34 +74,22 @@ class SignatureResult:
     raw: Mapping[str, Any] | None = None
 
     @classmethod
-    def from_soap_response(cls, response: Mapping[str, Any]) -> "SignatureResult":
+    def from_soap_response(cls, response: Mapping[str, Any]) -> SignatureResult:
         """Parse the SOAP body MSign returns.
 
         Accepts both the snake_case form ``zeep`` normalizes to and the
         PascalCase form found in the WSDL — robust against future MSign
         revisions.
         """
-        signed_b64 = (
-            response.get("SignedDocument")
-            or response.get("signed_document")
-            or response.get("Content")
-        )
+        signed_b64 = response.get("SignedDocument") or response.get("signed_document") or response.get("Content")
         if signed_b64 is None:
             raise MSignError("MSign response missing SignedDocument")
         try:
             signed = base64.b64decode(signed_b64)
         except (TypeError, ValueError) as exc:
             raise MSignError("MSign response not base64") from exc
-        sig_id = (
-            response.get("SignatureID")
-            or response.get("signature_id")
-            or response.get("Id", "")
-        )
-        chain_raw = (
-            response.get("CertificateChain")
-            or response.get("certificate_chain")
-            or []
-        )
+        sig_id = response.get("SignatureID") or response.get("signature_id") or response.get("Id", "")
+        chain_raw = response.get("CertificateChain") or response.get("certificate_chain") or []
         if isinstance(chain_raw, str):
             chain: tuple[str, ...] = (chain_raw,)
         else:
@@ -172,7 +161,7 @@ class MSignClient:
     # -- construction helpers -------------------------------------------
 
     @classmethod
-    def from_config(cls, config: Any, *, invoker: SoapInvoker | None = None) -> "MSignClient":
+    def from_config(cls, config: Any, *, invoker: SoapInvoker | None = None) -> MSignClient:
         return cls(
             wsdl_url=config.msign_wsdl_url,
             client_id=config.msign_client_id,
@@ -226,9 +215,7 @@ class MSignClient:
             from zeep import Client
             from zeep.transports import Transport
         except ImportError as exc:  # pragma: no cover
-            raise MSignError(
-                "zeep is not installed; install the 'identity' extra"
-            ) from exc
+            raise MSignError("zeep is not installed; install the 'identity' extra") from exc
         transport = Transport(timeout=self.timeout)
         self._zeep_client = Client(self.wsdl_url, transport=transport)
         return self._zeep_client

@@ -23,7 +23,7 @@ SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -58,11 +58,11 @@ class RouterAdapter:
         self,
         *,
         model: str,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         max_tokens: int,
         temperature: float = 0.7,
-        extra_body: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        extra_body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         POST /v1/chat/completions through Router by MP.
 
@@ -76,7 +76,7 @@ class RouterAdapter:
         restricted = any(k in model.lower() for k in ("gpt-5", "o1-", "o3", "o4"))
         token_key = "max_completion_tokens" if restricted else "max_tokens"
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
             token_key: max_tokens,
@@ -94,24 +94,18 @@ class RouterAdapter:
         }
 
         try:
-            r = await self._http.post(
-                url, json=payload, headers=headers, timeout=self._timeout
-            )
+            r = await self._http.post(url, json=payload, headers=headers, timeout=self._timeout)
         except httpx.HTTPError as exc:
             raise RouterError(f"Router transport error: {exc}") from exc
 
         if r.status_code >= 500:
-            raise RouterError(
-                f"Router 5xx: status={r.status_code} body={r.text[:200]!r}"
-            )
+            raise RouterError(f"Router 5xx: status={r.status_code} body={r.text[:200]!r}")
         if r.status_code == 429:
             raise RouterError(f"Router rate-limited (429): {r.text[:200]!r}")
         if r.status_code >= 400:
             # 4xx is a permanent client error — surface as RouterError so the
             # caller can decide whether to fall back or fail loudly.
-            raise RouterError(
-                f"Router 4xx: status={r.status_code} body={r.text[:200]!r}"
-            )
+            raise RouterError(f"Router 4xx: status={r.status_code} body={r.text[:200]!r}")
 
         try:
             return r.json()

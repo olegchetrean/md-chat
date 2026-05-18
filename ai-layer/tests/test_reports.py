@@ -5,22 +5,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
 from md_chat_ai.reports import (
     AI_ACT_DISCLOSURES,
+    TEMPLATES,
     DailyBriefing,
     Report,
     ReportAgent,
     ReportStatus,
-    TEMPLATES,
     apply_pii_redaction,
     get_template,
     list_templates,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -32,11 +31,11 @@ def mock_llm():
     """Async LLM stub that echoes the section title back in the body."""
     call_count = {"n": 0}
 
-    async def _llm(messages: List[Dict[str, str]]) -> str:
+    async def _llm(messages: list[dict[str, str]]) -> str:
         call_count["n"] += 1
         sys = next((m["content"] for m in messages if m["role"] == "system"), "")
         title = "Section"
-        if 'section:' in sys.lower():
+        if "section:" in sys.lower():
             after = sys.split(":", 1)[1]
             title = after.split("\n", 1)[0].strip().strip('"')
         return f"Generated content for: {title}.\n\nDetailed analysis follows here. " + ("Lorem ipsum. " * 10)
@@ -46,7 +45,7 @@ def mock_llm():
 
 
 @pytest.fixture
-def mock_conversations() -> List[Dict[str, Any]]:
+def mock_conversations() -> list[dict[str, Any]]:
     today = datetime.utcnow()
     return [
         {
@@ -85,7 +84,7 @@ def mock_conversations() -> List[Dict[str, Any]]:
 
 
 @pytest.fixture
-def mock_promises() -> List[Dict[str, Any]]:
+def mock_promises() -> list[dict[str, Any]]:
     today = datetime.utcnow()
     return [
         {
@@ -210,9 +209,7 @@ async def test_report_includes_compute_backend_metadata(mock_llm):
     assert "on_device" in md
 
     # Override per-call
-    report2 = await agent.generate(
-        "daily_digest", context={}, language="en", compute_backend="router_open"
-    )
+    report2 = await agent.generate("daily_digest", context={}, language="en", compute_backend="router_open")
     assert report2.compute_backend == "router_open"
 
 
@@ -292,7 +289,7 @@ def test_apply_pii_redaction_noop_on_clean_text():
 async def test_report_redacts_pii_in_context(mock_llm):
     """PII inside context strings should be redacted before LLM call."""
 
-    captured: Dict[str, str] = {}
+    captured: dict[str, str] = {}
 
     async def capturing_llm(messages):
         # Snapshot the user message that contains the context JSON
@@ -324,7 +321,12 @@ def test_daily_briefing_aggregates_mock_data(mock_conversations, mock_promises):
         conversations=mock_conversations,
         promises=mock_promises,
         mentions=[
-            {"room": "#sales", "sender": "@alice", "text": "@me can you review?", "timestamp": "now"},
+            {
+                "room": "#sales",
+                "sender": "@alice",
+                "text": "@me can you review?",
+                "timestamp": "now",
+            },
         ],
     )
 

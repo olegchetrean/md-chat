@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -31,7 +31,6 @@ from md_chat_ai.graph import (
     normalise_consent_tier,
 )
 
-
 # ---------------------------------------------------------------------------
 # Driver mock fixtures
 # ---------------------------------------------------------------------------
@@ -40,10 +39,8 @@ from md_chat_ai.graph import (
 class _StubResult:
     """Mimics a neo4j ``Result`` iterable of dict-like records."""
 
-    def __init__(self, records: List[Dict[str, Any]]):
-        self._records = [
-            _StubRecord(r) if not isinstance(r, _StubRecord) else r for r in records
-        ]
+    def __init__(self, records: list[dict[str, Any]]):
+        self._records = [_StubRecord(r) if not isinstance(r, _StubRecord) else r for r in records]
 
     def __iter__(self):
         return iter(self._records)
@@ -52,7 +49,7 @@ class _StubResult:
 class _StubRecord:
     """A dict-like neo4j record."""
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     def __getitem__(self, key: str) -> Any:
@@ -68,7 +65,7 @@ class _StubRecord:
 class _StubSession:
     """Mimics ``neo4j.Session``; records every ``run`` call."""
 
-    def __init__(self, driver: "_StubDriver"):
+    def __init__(self, driver: _StubDriver):
         self._driver = driver
 
     def __enter__(self):
@@ -77,7 +74,7 @@ class _StubSession:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def run(self, cypher: str, params: Dict[str, Any] | None = None) -> _StubResult:
+    def run(self, cypher: str, params: dict[str, Any] | None = None) -> _StubResult:
         self._driver.calls.append((cypher, params or {}))
         # Honour the next-result queue, fall back to []
         if self._driver.next_results:
@@ -89,8 +86,8 @@ class _StubDriver:
     """In-memory replacement for ``neo4j.GraphDatabase.driver()``."""
 
     def __init__(self):
-        self.calls: List[tuple] = []
-        self.next_results: List[List[Dict[str, Any]]] = []
+        self.calls: list[tuple] = []
+        self.next_results: list[list[dict[str, Any]]] = []
         self.closed = False
 
     def session(self, database: str = "neo4j") -> _StubSession:
@@ -185,27 +182,26 @@ def test_backend_schema_setup_runs_expected_cyphers(stub_driver, backend):
     # Index/constraint statements all start with CREATE
     create_calls = [c for c, _ in stub_driver.calls if c.startswith("CREATE")]
     assert len(create_calls) == len(Neo4jGraphBackend._SETUP_CYPHER)
-    assert any("e.consent_tier" in c for c, _ in stub_driver.calls), \
-        "consent_tier index must be created"
+    assert any("e.consent_tier" in c for c, _ in stub_driver.calls), "consent_tier index must be created"
 
 
 def test_add_entity_writes_consent_tier(stub_driver, backend):
     """add_entity must persist the consent_tier parameter."""
     stub_driver.next_results = [[{"eid": "abc123"}]]
-    eid = asyncio.run(backend.add_entity(
-        graph_id="g1",
-        name="@oleg",
-        entity_type="User",
-        summary="MD-Chat founder",
-        attributes={"handle": "oleg"},
-        consent_tier="friends",
-    ))
+    eid = asyncio.run(
+        backend.add_entity(
+            graph_id="g1",
+            name="@oleg",
+            entity_type="User",
+            summary="MD-Chat founder",
+            attributes={"handle": "oleg"},
+            consent_tier="friends",
+        )
+    )
     assert eid == "abc123"
 
     # Find the add_entity call (the MERGE on Entity)
-    merge_calls = [
-        (c, p) for c, p in stub_driver.calls if "MERGE (e:Entity" in c
-    ]
+    merge_calls = [(c, p) for c, p in stub_driver.calls if "MERGE (e:Entity" in c]
     assert merge_calls, "add_entity must issue a MERGE"
     _, params = merge_calls[-1]
     assert params["consent_tier"] == "friends"
@@ -216,29 +212,31 @@ def test_add_entity_writes_consent_tier(stub_driver, backend):
 def test_add_entity_invalid_tier_falls_back_to_private(stub_driver, backend):
     """An unknown consent_tier value must be coerced to 'private'."""
     stub_driver.next_results = [[{"eid": "xyz"}]]
-    asyncio.run(backend.add_entity(
-        graph_id="g1",
-        name="Maria",
-        entity_type="Contact",
-        consent_tier="leaky",  # invalid
-    ))
-    _, params = [
-        (c, p) for c, p in stub_driver.calls if "MERGE (e:Entity" in c
-    ][-1]
+    asyncio.run(
+        backend.add_entity(
+            graph_id="g1",
+            name="Maria",
+            entity_type="Contact",
+            consent_tier="leaky",  # invalid
+        )
+    )
+    _, params = [(c, p) for c, p in stub_driver.calls if "MERGE (e:Entity" in c][-1]
     assert params["consent_tier"] == "private"
 
 
 def test_add_edge_writes_consent_tier(stub_driver, backend):
     """add_edge must persist consent_tier on the relationship."""
     stub_driver.next_results = [[{"rid": "rel_42"}]]
-    rid = asyncio.run(backend.add_edge(
-        graph_id="g1",
-        source="@oleg",
-        target="@lilia",
-        edge_type="RELATED",
-        fact="co-founders",
-        consent_tier="public",
-    ))
+    rid = asyncio.run(
+        backend.add_edge(
+            graph_id="g1",
+            source="@oleg",
+            target="@lilia",
+            edge_type="RELATED",
+            fact="co-founders",
+            consent_tier="public",
+        )
+    )
     assert rid == "rel_42"
     edge_calls = [(c, p) for c, p in stub_driver.calls if "MERGE (src)-[r:EDGE" in c]
     assert edge_calls
@@ -251,8 +249,7 @@ def test_get_nodes_with_consent_tier_filters_query(stub_driver, backend):
     """Filtering by tier must add a WHERE clause and pass the tier list."""
     asyncio.run(backend.get_nodes("g1", consent_tiers=["public", "friends"]))
     filtered_calls = [
-        (c, p) for c, p in stub_driver.calls
-        if "MATCH (e:Entity {graph_id: $graph_id})" in c and "consent_tier" in c
+        (c, p) for c, p in stub_driver.calls if "MATCH (e:Entity {graph_id: $graph_id})" in c and "consent_tier" in c
     ]
     assert filtered_calls, "consent_tiers must trigger a filtered query"
     _, params = filtered_calls[-1]
@@ -323,8 +320,7 @@ def test_adapter_message_without_opt_in_strips_body():
     parsed = adapter.parse_event(event)
     mentions = [e for e in parsed.edges if e["edge_type"] == "MENTIONED"]
     assert mentions, "mentions must produce edges"
-    assert mentions[0]["fact"] == "", \
-        "without opt_in_content the fact body must be empty"
+    assert mentions[0]["fact"] == "", "without opt_in_content the fact body must be empty"
 
 
 def test_adapter_message_with_opt_in_keeps_body():
@@ -350,29 +346,33 @@ def test_adapter_message_with_opt_in_keeps_body():
 def test_adapter_supports_custom_md_chat_events():
     """OWNS_BUSINESS / USED_MINIAPP / OWNS_TWIN / PROMISED must be parsed."""
     adapter = SynapseEventAdapter()
-    business = adapter.parse_event({
-        "type": "md.chat.business_owned",
-        "sender": "@oleg:md-chat.eu",
-        "content": {"company": "MEGA Promoting SRL", "role": "CEO",
-                    "consent_tier": "public"},
-    })
+    business = adapter.parse_event(
+        {
+            "type": "md.chat.business_owned",
+            "sender": "@oleg:md-chat.eu",
+            "content": {"company": "MEGA Promoting SRL", "role": "CEO", "consent_tier": "public"},
+        }
+    )
     assert any(e["edge_type"] == "OWNS_BUSINESS" for e in business.edges)
     assert any(n["entity_type"] == "Company" for n in business.nodes)
 
-    miniapp = adapter.parse_event({
-        "type": "md.chat.miniapp_used",
-        "sender": "@oleg:md-chat.eu",
-        "content": {"miniapp": "Wallet", "category": "finance",
-                    "consent_tier": "friends"},
-    })
+    miniapp = adapter.parse_event(
+        {
+            "type": "md.chat.miniapp_used",
+            "sender": "@oleg:md-chat.eu",
+            "content": {"miniapp": "Wallet", "category": "finance", "consent_tier": "friends"},
+        }
+    )
     assert any(e["edge_type"] == "USED_MINIAPP" for e in miniapp.edges)
     assert any(n["entity_type"] == "MiniApp" for n in miniapp.nodes)
 
-    twin = adapter.parse_event({
-        "type": "md.chat.twin_created",
-        "sender": "@oleg:md-chat.eu",
-        "content": {"twin": "Oleg Twin", "model": "claude-opus-4-7"},
-    })
+    twin = adapter.parse_event(
+        {
+            "type": "md.chat.twin_created",
+            "sender": "@oleg:md-chat.eu",
+            "content": {"twin": "Oleg Twin", "model": "claude-opus-4-7"},
+        }
+    )
     assert any(e["edge_type"] == "OWNS_TWIN" for e in twin.edges)
     assert any(n["entity_type"] == "Twin" for n in twin.nodes)
 
@@ -408,9 +408,13 @@ def test_builder_ingests_synapse_events_end_to_end(stub_driver, backend):
         # _run_analytics_async → get_edges
         + [[]]
         # get_graph_stats — node_cypher
-        + [[{"etype": "User", "tier": "friends", "cnt": 1},
-            {"etype": "Group", "tier": "friends", "cnt": 1},
-            {"etype": "Contact", "tier": "public", "cnt": 1}]]
+        + [
+            [
+                {"etype": "User", "tier": "friends", "cnt": 1},
+                {"etype": "Group", "tier": "friends", "cnt": 1},
+                {"etype": "Contact", "tier": "public", "cnt": 1},
+            ]
+        ]
         # get_graph_stats — edge_cypher
         + [[{"cnt": 2}]]
     )
@@ -444,9 +448,7 @@ def test_builder_ingests_synapse_events_end_to_end(stub_driver, backend):
     assert info.edge_count == 2
     assert "User" in info.entity_types
     # Verify the ontology JSON was passed to set_ontology
-    ontology_calls = [
-        p for c, p in stub_driver.calls if "g.ontology_json" in c
-    ]
+    ontology_calls = [p for c, p in stub_driver.calls if "g.ontology_json" in c]
     assert ontology_calls
     persisted = json.loads(ontology_calls[-1]["ontology_json"])
     assert any(e["name"] == "MiniApp" for e in persisted["entity_types"])
@@ -462,22 +464,30 @@ def test_entity_reader_filters_to_mdchat_entity_types(stub_driver, backend):
     # First call: get_nodes
     stub_driver.next_results = [
         [
-            {"e": _StubRecord({
-                "entity_id": "n1",
-                "name": "@oleg",
-                "entity_type": "User",
-                "summary": "founder",
-                "attributes_json": "{}",
-                "consent_tier": "public",
-            })},
-            {"e": _StubRecord({
-                "entity_id": "n2",
-                "name": "junk",
-                "entity_type": "Entity",  # generic system label only
-                "summary": "",
-                "attributes_json": "{}",
-                "consent_tier": "private",
-            })},
+            {
+                "e": _StubRecord(
+                    {
+                        "entity_id": "n1",
+                        "name": "@oleg",
+                        "entity_type": "User",
+                        "summary": "founder",
+                        "attributes_json": "{}",
+                        "consent_tier": "public",
+                    }
+                )
+            },
+            {
+                "e": _StubRecord(
+                    {
+                        "entity_id": "n2",
+                        "name": "junk",
+                        "entity_type": "Entity",  # generic system label only
+                        "summary": "",
+                        "attributes_json": "{}",
+                        "consent_tier": "private",
+                    }
+                )
+            },
         ],
         # second call: get_edges
         [],

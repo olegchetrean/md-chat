@@ -20,10 +20,9 @@ from __future__ import annotations
 
 import importlib
 import os
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Pytest markers — registered here so we don't depend on pyproject markers.
@@ -97,6 +96,7 @@ def _safe_environment() -> Iterator[None]:
 
     # Force config reload so the frozen dataclass picks up our values.
     import md_chat_ai.config as config_module
+
     importlib.reload(config_module)
 
     yield
@@ -121,6 +121,7 @@ def app():
     (rate-limit counters, in-memory caches, etc.).
     """
     from md_chat_ai.api import create_app
+
     flask_app = create_app()
     flask_app.config.update(TESTING=True)
     return flask_app
@@ -144,24 +145,43 @@ def mock_neo4j(monkeypatch):
     Tests that simply need the import to succeed without a real DB should
     request this fixture.
     """
+
     class _Session:
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
         def run(self, *a, **kw):
             class _Result:
-                def single(self): return None
-                def data(self): return []
-                def __iter__(self): return iter([])
+                def single(self):
+                    return None
+
+                def data(self):
+                    return []
+
+                def __iter__(self):
+                    return iter([])
+
             return _Result()
-        def close(self): pass
+
+        def close(self):
+            pass
 
     class _Driver:
-        def session(self, *a, **kw): return _Session()
-        def close(self): pass
-        def verify_connectivity(self): return None
+        def session(self, *a, **kw):
+            return _Session()
+
+        def close(self):
+            pass
+
+        def verify_connectivity(self):
+            return None
 
     try:
         import neo4j  # type: ignore
+
         monkeypatch.setattr(neo4j.GraphDatabase, "driver", lambda *a, **kw: _Driver())
     except ImportError:
         pytest.skip("neo4j driver not installed")
@@ -175,24 +195,38 @@ def mock_redis(monkeypatch):
     store: dict[str, str] = {}
 
     class _FakeRedis:
-        def __init__(self, *a, **kw): pass
-        def get(self, k): return store.get(k)
+        def __init__(self, *a, **kw):
+            pass
+
+        def get(self, k):
+            return store.get(k)
+
         def set(self, k, v, *a, **kw):
             store[k] = v if isinstance(v, str) else str(v)
             return True
+
         def delete(self, *keys):
-            for k in keys: store.pop(k, None)
+            for k in keys:
+                store.pop(k, None)
             return len(keys)
+
         def incr(self, k, amount=1):
             cur = int(store.get(k, "0")) + amount
             store[k] = str(cur)
             return cur
-        def expire(self, k, ttl): return True
-        def ping(self): return True
-        def close(self): pass
+
+        def expire(self, k, ttl):
+            return True
+
+        def ping(self):
+            return True
+
+        def close(self):
+            pass
 
     try:
         import redis  # type: ignore
+
         monkeypatch.setattr(redis, "Redis", _FakeRedis)
         if hasattr(redis, "StrictRedis"):
             monkeypatch.setattr(redis, "StrictRedis", _FakeRedis)

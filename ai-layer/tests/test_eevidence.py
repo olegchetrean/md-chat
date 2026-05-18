@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 from flask import Flask
@@ -19,7 +19,6 @@ from md_chat_ai.eevidence import (
     TicketStatus,
     triage_order,
 )
-
 
 # --------------------------------------------------------------- fixtures
 

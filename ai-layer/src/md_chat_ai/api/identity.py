@@ -41,7 +41,7 @@ def _load_signing_key() -> str | None:
     if not path or not os.path.exists(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             return fh.read()
     except OSError:
         logger.warning("oidc: unable to read signing key at %s", path)
@@ -130,9 +130,7 @@ def _build_blueprint() -> Blueprint:
             logger.exception("saml/acs: response invalid")
             return jsonify({"error": "invalid_saml_response", "detail": str(exc)}), 400
         try:
-            code, redirect_uri, state = bridge.complete_authorization(
-                relay_state=relay_state, saml_attributes=attrs
-            )
+            code, redirect_uri, state = bridge.complete_authorization(relay_state=relay_state, saml_attributes=attrs)
         except OIDCError as exc:
             return jsonify(exc.as_dict()), 400
         sep = "&" if "?" in redirect_uri else "?"
@@ -154,9 +152,7 @@ def _build_blueprint() -> Blueprint:
         except Exception:
             return jsonify({"error": "document_b64 is not valid base64"}), 400
         try:
-            result = client.sign(
-                SignatureRequest(document=document, mime_type=mime, purpose="md-chat")
-            )
+            result = client.sign(SignatureRequest(document=document, mime_type=mime, purpose="md-chat"))
         except MSignError as exc:
             return jsonify({"error": "msign_failure", "detail": str(exc)}), 502
         return jsonify(
@@ -207,9 +203,7 @@ def _build_oidc_root_blueprint() -> Blueprint:
         except KeyError as exc:
             return jsonify({"error": "invalid_request", "missing": str(exc)}), 400
         try:
-            saml_env = sp.build_authn_request(
-                _request_data(), relay_state=envelope["relay_state"]
-            )
+            saml_env = sp.build_authn_request(_request_data(), relay_state=envelope["relay_state"])
         except Exception as exc:
             logger.exception("oidc/authorize: failed to build SAML AuthnRequest")
             return jsonify({"error": "saml_failure", "detail": str(exc)}), 500

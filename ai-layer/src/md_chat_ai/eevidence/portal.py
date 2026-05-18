@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -65,7 +65,7 @@ class ProductionOrder(BaseModel):
         max_length=320,
         description="MD-Chat user identifier (username / phone / email / matrix id).",
     )
-    target_country: Optional[str] = Field(
+    target_country: str | None = Field(
         default=None,
         min_length=2,
         max_length=2,
@@ -78,8 +78,7 @@ class ProductionOrder(BaseModel):
     )
     urgency_level: UrgencyLevel = Field(
         default="standard",
-        description="standard (10 days), expedited (≤72 h voluntary), "
-        "emergency (8 h, Art. 10(2)).",
+        description="standard (10 days), expedited (≤72 h voluntary), " "emergency (8 h, Art. 10(2)).",
     )
     legal_basis: str = Field(
         ...,
@@ -108,14 +107,14 @@ class ProductionOrder(BaseModel):
         max_length=320,
         description="Operational contact of the issuing authority for clarifications.",
     )
-    attachment_url: Optional[str] = Field(
+    attachment_url: str | None = Field(
         default=None,
         description="Signed link to the full EPOC PDF / structured XML.",
     )
 
     @field_validator("member_state", "target_country")
     @classmethod
-    def _upper_country_code(cls, value: Optional[str]) -> Optional[str]:
+    def _upper_country_code(cls, value: str | None) -> str | None:
         return value.upper() if value else value
 
 
@@ -141,7 +140,7 @@ class PreservationOrder(BaseModel):
         description="Art. 9(1): up to 60 days; renewable once for another 60 (Art. 9(6)).",
     )
     contact_email: str = Field(..., min_length=5, max_length=320)
-    attachment_url: Optional[str] = None
+    attachment_url: str | None = None
 
     @field_validator("member_state")
     @classmethod
@@ -165,8 +164,7 @@ class OrderResponse(BaseModel):
     )
     refusal_grounds: list[str] = Field(
         default_factory=list,
-        description="Refusal ground identifiers (see "
-        ":class:`~md_chat_ai.eevidence.triage.RefusalGround`).",
+        description="Refusal ground identifiers (see " ":class:`~md_chat_ai.eevidence.triage.RefusalGround`).",
     )
     rationale: str = Field(
         default="",
@@ -205,14 +203,14 @@ class OrderTicket:
     payload: dict[str, Any]
     triage: TriageDecision
     status: TicketStatus = TicketStatus.RECEIVED
-    sla_deadline: Optional[datetime] = None
+    sla_deadline: datetime | None = None
     """Deadline after which the order is in SLA breach. Set on emergency
     marking or at ticket creation for standard orders (10 days, Art. 10(1))."""
 
-    emergency_marked_at: Optional[datetime] = None
-    emergency_justification: Optional[str] = None
-    response: Optional[OrderResponse] = None
-    responded_at: Optional[datetime] = None
+    emergency_marked_at: datetime | None = None
+    emergency_justification: str | None = None
+    response: OrderResponse | None = None
+    responded_at: datetime | None = None
 
     history: list[str] = field(default_factory=list)
     """Free-form lifecycle events, mirrored verbosely in the audit register."""
@@ -226,9 +224,7 @@ class OrderTicket:
             "order_kind": self.order_kind,
             "status": self.status.value,
             "sla_deadline": self.sla_deadline.isoformat() if self.sla_deadline else None,
-            "emergency_marked_at": (
-                self.emergency_marked_at.isoformat() if self.emergency_marked_at else None
-            ),
+            "emergency_marked_at": (self.emergency_marked_at.isoformat() if self.emergency_marked_at else None),
             "emergency_justification": self.emergency_justification,
             "triage": {
                 "should_refuse": self.triage.should_refuse,
@@ -248,7 +244,7 @@ class OrderTicket:
 def _generate_ticket_id() -> str:
     """Cryptographically random, human-typeable ticket ID."""
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    stamp = datetime.now(UTC).strftime("%Y%m%d")
     suffix = secrets.token_hex(4).upper()
     return f"EE-{stamp}-{suffix}"
 
@@ -285,7 +281,7 @@ class ProductionOrderPortal:
     #: Emergency execution deadline (Art. 10(2)).
     EMERGENCY_DEADLINE = timedelta(hours=8)
 
-    def __init__(self, audit: Optional[AuditRegister] = None) -> None:
+    def __init__(self, audit: AuditRegister | None = None) -> None:
         import threading
 
         self._audit = audit or AuditRegister()
@@ -304,7 +300,7 @@ class ProductionOrderPortal:
         """Accept an EPOC, run triage, assign ticket, log."""
 
         triage = triage_order(order)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         deadline = now + self.STANDARD_DEADLINE
         if order.urgency_level == "emergency":
             deadline = now + self.EMERGENCY_DEADLINE
@@ -317,19 +313,13 @@ class ProductionOrderPortal:
                 order_kind="production",
                 payload=order.model_dump(),
                 triage=triage,
-                status=(
-                    TicketStatus.EMERGENCY
-                    if order.urgency_level == "emergency"
-                    else TicketStatus.UNDER_REVIEW
-                ),
+                status=(TicketStatus.EMERGENCY if order.urgency_level == "emergency" else TicketStatus.UNDER_REVIEW),
                 sla_deadline=deadline,
                 emergency_marked_at=now if order.urgency_level == "emergency" else None,
             )
             ticket.history.append(f"received:{order.urgency_level}")
             if triage.should_refuse:
-                ticket.history.append(
-                    "triage:flagged:" + ",".join(g.value for g in triage.grounds)
-                )
+                ticket.history.append("triage:flagged:" + ",".join(g.value for g in triage.grounds))
             self._tickets[ticket_id] = ticket
 
         self._audit.append(
@@ -354,7 +344,7 @@ class ProductionOrderPortal:
     def submit_preservation(self, order: PreservationOrder) -> OrderTicket:
         """Accept an EPOC-PR (Art. 9)."""
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
             ticket_id = _generate_ticket_id()
             ticket = OrderTicket(
@@ -403,15 +393,13 @@ class ProductionOrderPortal:
 
         if not justification or len(justification.strip()) < 12:
             raise ValueError("emergency justification too short — needs >= 12 chars")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
             ticket = self._tickets.get(ticket_id)
             if ticket is None:
                 raise KeyError(f"unknown ticket {ticket_id!r}")
             if ticket.status in {TicketStatus.RESPONDED, TicketStatus.REFUSED}:
-                raise RuntimeError(
-                    f"ticket {ticket_id} already closed with status {ticket.status.value}"
-                )
+                raise RuntimeError(f"ticket {ticket_id} already closed with status {ticket.status.value}")
             ticket.status = TicketStatus.EMERGENCY
             ticket.emergency_marked_at = now
             ticket.emergency_justification = justification.strip()
@@ -424,9 +412,7 @@ class ProductionOrderPortal:
             actor=actor,
             details={
                 "justification": justification.strip(),
-                "new_deadline": ticket.sla_deadline.isoformat()
-                if ticket.sla_deadline
-                else None,
+                "new_deadline": ticket.sla_deadline.isoformat() if ticket.sla_deadline else None,
             },
         )
         return ticket
@@ -438,24 +424,20 @@ class ProductionOrderPortal:
         ticket_id: str,
         response: OrderResponse,
         *,
-        actor: Optional[str] = None,
+        actor: str | None = None,
     ) -> OrderTicket:
         """Close a ticket with the operator's response."""
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
             ticket = self._tickets.get(ticket_id)
             if ticket is None:
                 raise KeyError(f"unknown ticket {ticket_id!r}")
             if ticket.status in {TicketStatus.RESPONDED, TicketStatus.REFUSED}:
-                raise RuntimeError(
-                    f"ticket {ticket_id} already closed with status {ticket.status.value}"
-                )
+                raise RuntimeError(f"ticket {ticket_id} already closed with status {ticket.status.value}")
             ticket.response = response
             ticket.responded_at = now
-            ticket.status = (
-                TicketStatus.REFUSED if response.outcome == "refused" else TicketStatus.RESPONDED
-            )
+            ticket.status = TicketStatus.REFUSED if response.outcome == "refused" else TicketStatus.RESPONDED
             ticket.history.append(f"responded:{response.outcome}")
 
         self._audit.append(
@@ -473,7 +455,7 @@ class ProductionOrderPortal:
 
     # ----------------------------------------------------------- queries
 
-    def get(self, ticket_id: str) -> Optional[OrderTicket]:
+    def get(self, ticket_id: str) -> OrderTicket | None:
         with self._lock:
             return self._tickets.get(ticket_id)
 
@@ -481,11 +463,7 @@ class ProductionOrderPortal:
         """Tickets not yet closed (responded / refused)."""
 
         with self._lock:
-            return [
-                t
-                for t in self._tickets.values()
-                if t.status not in {TicketStatus.RESPONDED, TicketStatus.REFUSED}
-            ]
+            return [t for t in self._tickets.values() if t.status not in {TicketStatus.RESPONDED, TicketStatus.REFUSED}]
 
     def list_all(self) -> list[OrderTicket]:
         with self._lock:

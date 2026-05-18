@@ -48,8 +48,8 @@ Apache License 2.0 — see ``ai-layer/LICENSE``.
 from __future__ import annotations
 
 from .mpass_saml import (
-    AttributeReleasePolicy,
     LOA,
+    AttributeReleasePolicy,
     MPassAttributes,
     MPassSamlSP,
     map_birth_year_to_age_band,

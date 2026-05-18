@@ -65,15 +65,18 @@ Repository = "https://github.com/olegchetrean/md-chat"
 where = ["src"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+# E501: black handles line wrapping; ignore for LLM prompt strings (multi-line f-strings).
+# UP042: `class X(str, Enum)` is fine — StrEnum migration is a separate cleanup.
+ignore = ["E501", "UP042"]
 
 [tool.black]
-line-length = 100
+line-length = 120
 target-version = ["py311"]
 
 [tool.mypy]

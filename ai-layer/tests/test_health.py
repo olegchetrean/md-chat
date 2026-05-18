@@ -22,7 +22,9 @@ def test_ready_endpoint_503_when_unconfigured(monkeypatch):
 
     # Reload config module.
     from importlib import reload
+
     from md_chat_ai import config
+
     reload(config)
 
     app = create_app()

@@ -26,7 +26,6 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
 
 from ..config import CONFIG  # noqa: F401  -- imported for future config hooks
 
@@ -36,6 +35,7 @@ logger = logging.getLogger("md_chat_ai.security.rate_limiter")
 # ---------------------------------------------------------------------------
 # Namespace configuration
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class NamespaceLimit:
@@ -55,15 +55,15 @@ class NamespaceLimit:
         return self.capacity / self.window_seconds if self.window_seconds > 0 else 1e9
 
 
-_DEFAULT_NAMESPACES: Dict[str, NamespaceLimit] = {
+_DEFAULT_NAMESPACES: dict[str, NamespaceLimit] = {
     # 1 signup attempt every 60 s per IP / phone — anti-flood.
-    "signup":    NamespaceLimit(capacity=1,  window_seconds=60.0),
+    "signup": NamespaceLimit(capacity=1, window_seconds=60.0),
     # ~30 messages per minute per user.
     "twin-chat": NamespaceLimit(capacity=30, window_seconds=60.0),
     # 1 morning / evening briefing per hour per user.
-    "briefing":  NamespaceLimit(capacity=1,  window_seconds=3600.0),
+    "briefing": NamespaceLimit(capacity=1, window_seconds=3600.0),
     # Fallback for any namespace that isn't explicitly configured.
-    "default":   NamespaceLimit(capacity=100, window_seconds=60.0),
+    "default": NamespaceLimit(capacity=100, window_seconds=60.0),
 }
 
 
@@ -76,7 +76,7 @@ class RateLimitResult:
     namespace: str
     identifier: str
 
-    def as_dict(self) -> Dict[str, object]:
+    def as_dict(self) -> dict[str, object]:
         return {
             "allowed": self.allowed,
             "retry_after": int(self.retry_after) + (0 if self.allowed else 1),
@@ -88,6 +88,7 @@ class RateLimitResult:
 # ---------------------------------------------------------------------------
 # In-memory token bucket backend
 # ---------------------------------------------------------------------------
+
 
 class _TokenBucket:
     """Single thread-safe token bucket used by the in-memory backend."""
@@ -101,7 +102,7 @@ class _TokenBucket:
         self.last_refill: float = time.monotonic()
         self.lock: threading.Lock = threading.Lock()
 
-    def consume(self) -> Tuple[bool, float]:
+    def consume(self) -> tuple[bool, float]:
         with self.lock:
             now = time.monotonic()
             elapsed = now - self.last_refill
@@ -121,14 +122,12 @@ class _InMemoryBackend:
     _EVICT_CHECK_INTERVAL: float = 300.0
 
     def __init__(self) -> None:
-        self._buckets: Dict[Tuple[str, str], _TokenBucket] = {}
-        self._last_access: Dict[Tuple[str, str], float] = {}
+        self._buckets: dict[tuple[str, str], _TokenBucket] = {}
+        self._last_access: dict[tuple[str, str], float] = {}
         self._lock = threading.Lock()
         self._last_eviction = time.monotonic()
 
-    def consume(
-        self, namespace: str, identifier: str, limit: NamespaceLimit
-    ) -> Tuple[bool, float]:
+    def consume(self, namespace: str, identifier: str, limit: NamespaceLimit) -> tuple[bool, float]:
         key = (namespace, identifier)
         with self._lock:
             self._maybe_evict()
@@ -139,7 +138,7 @@ class _InMemoryBackend:
             self._last_access[key] = time.monotonic()
         return bucket.consume()
 
-    def reset(self, namespace: Optional[str] = None) -> None:
+    def reset(self, namespace: str | None = None) -> None:
         with self._lock:
             if namespace is None:
                 self._buckets.clear()
@@ -166,6 +165,7 @@ class _InMemoryBackend:
 # Redis backend (lazy import, optional)
 # ---------------------------------------------------------------------------
 
+
 class _RedisBackend:
     """Fixed-window counter using `INCR` + `EXPIRE` in Redis.
 
@@ -176,9 +176,7 @@ class _RedisBackend:
     def __init__(self, client) -> None:  # type: ignore[no-untyped-def]
         self._r = client
 
-    def consume(
-        self, namespace: str, identifier: str, limit: NamespaceLimit
-    ) -> Tuple[bool, float]:
+    def consume(self, namespace: str, identifier: str, limit: NamespaceLimit) -> tuple[bool, float]:
         # Fixed window keyed by `floor(now / window_seconds)` so that a fresh
         # window grants a clean quota without a sliding TTL.
         now = time.time()
@@ -192,7 +190,9 @@ class _RedisBackend:
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "RateLimiter: Redis error namespace=%s id=%s: %s — failing open",
-                namespace, identifier, exc,
+                namespace,
+                identifier,
+                exc,
             )
             return True, 0.0
 
@@ -202,7 +202,7 @@ class _RedisBackend:
         retry_after = ((window_idx + 1) * limit.window_seconds) - now
         return False, max(1.0, retry_after)
 
-    def reset(self, namespace: Optional[str] = None) -> None:
+    def reset(self, namespace: str | None = None) -> None:
         pattern = f"mdchat:rl:{namespace or '*'}:*"
         try:
             for key in self._r.scan_iter(match=pattern, count=500):
@@ -215,6 +215,7 @@ class _RedisBackend:
 # Public façade
 # ---------------------------------------------------------------------------
 
+
 class RateLimiter:
     """Namespaced rate limiter with pluggable backend.
 
@@ -225,11 +226,11 @@ class RateLimiter:
 
     def __init__(
         self,
-        backend: Optional[str] = None,
-        redis_url: Optional[str] = None,
-        namespaces: Optional[Dict[str, NamespaceLimit]] = None,
+        backend: str | None = None,
+        redis_url: str | None = None,
+        namespaces: dict[str, NamespaceLimit] | None = None,
     ) -> None:
-        self._namespaces: Dict[str, NamespaceLimit] = dict(_DEFAULT_NAMESPACES)
+        self._namespaces: dict[str, NamespaceLimit] = dict(_DEFAULT_NAMESPACES)
         if namespaces:
             self._namespaces.update(namespaces)
 
@@ -250,13 +251,15 @@ class RateLimiter:
             logger.info("RateLimiter: using in-memory backend (no Redis)")
 
     @staticmethod
-    def _try_redis(redis_url: Optional[str]):  # type: ignore[no-untyped-def]
+    def _try_redis(redis_url: str | None):  # type: ignore[no-untyped-def]
         import os
+
         url = redis_url or os.environ.get("REDIS_URL")
         if not url:
             return None
         try:
             import redis  # type: ignore[import-not-found]
+
             client = redis.Redis.from_url(url, socket_connect_timeout=1, decode_responses=True)
             client.ping()
             return client
@@ -286,7 +289,9 @@ class RateLimiter:
         if not allowed:
             logger.info(
                 "RateLimiter: 429 namespace=%s id=%s retry_after=%.1fs",
-                namespace, identifier, retry_after,
+                namespace,
+                identifier,
+                retry_after,
             )
         return RateLimitResult(
             allowed=allowed,
@@ -295,13 +300,13 @@ class RateLimiter:
             identifier=identifier,
         )
 
-    def reset(self, namespace: Optional[str] = None) -> None:
+    def reset(self, namespace: str | None = None) -> None:
         """Clear all counters (optionally only for one namespace). Test-only."""
         self._backend.reset(namespace)
 
 
 # Module-level singleton.
-_limiter: Optional[RateLimiter] = None
+_limiter: RateLimiter | None = None
 
 
 def get_limiter() -> RateLimiter:

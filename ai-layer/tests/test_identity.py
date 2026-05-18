@@ -27,8 +27,8 @@ import pytest
 from flask import Flask
 
 from md_chat_ai.identity import (
-    AttributeReleasePolicy,
     LOA,
+    AttributeReleasePolicy,
     MPassAttributes,
     MSignClient,
     MSignError,
@@ -42,7 +42,6 @@ from md_chat_ai.identity import (
     saml_attributes_to_oidc_claims,
 )
 from md_chat_ai.identity.oidc_bridge import _verify_pkce
-
 
 # ---------------------------------------------------------------------------
 # Attribute mapping
@@ -259,9 +258,7 @@ class TestOIDCBridge:
             state="x",
         )
         attrs = MPassAttributes(verified=True, name_id="nid", loa=LOA.LOA1)
-        code, _, _ = bridge.complete_authorization(
-            relay_state=envelope["relay_state"], saml_attributes=attrs
-        )
+        code, _, _ = bridge.complete_authorization(relay_state=envelope["relay_state"], saml_attributes=attrs)
         bridge.exchange_code(
             code=code,
             client_id="synapse",
@@ -286,9 +283,7 @@ class TestOIDCBridge:
             state="x",
         )
         attrs = MPassAttributes(verified=True, name_id="nid", loa=LOA.LOA1)
-        code, _, _ = bridge.complete_authorization(
-            relay_state=env["relay_state"], saml_attributes=attrs
-        )
+        code, _, _ = bridge.complete_authorization(relay_state=env["relay_state"], saml_attributes=attrs)
         with pytest.raises(OIDCError) as exc:
             bridge.exchange_code(
                 code=code,
@@ -378,8 +373,8 @@ class TestMSign:
 
 
 def _make_test_app() -> tuple[Flask, OIDCBridge, MSignClient]:
-    from md_chat_ai.identity.mpass_saml import MPassSamlSP
     from md_chat_ai.api.identity import register_identity_routes
+    from md_chat_ai.identity.mpass_saml import MPassSamlSP
 
     app = Flask(__name__)
     bridge = _bridge_with_client(allow_idnp=False)
@@ -476,9 +471,7 @@ class TestBlueprint:
             "policy_purpose": "chat_account_provisioning",
             "issued_at": 0,
         }
-        code, redirect_uri, state = _test_inject_authorization(
-            app, relay_state="rs-1", attrs=attrs, pending=pending
-        )
+        code, redirect_uri, state = _test_inject_authorization(app, relay_state="rs-1", attrs=attrs, pending=pending)
         client = app.test_client()
         resp = client.post(
             "/oidc/token",

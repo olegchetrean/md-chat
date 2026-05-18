@@ -31,7 +31,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Deque, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -81,9 +81,9 @@ class TwinDisclosure(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
 
     @classmethod
-    def for_language(cls, language: DisclosureLanguage) -> "TwinDisclosure":
+    def for_language(cls, language: DisclosureLanguage) -> TwinDisclosure:
         """Build the canonical disclosure for the given language."""
-        text_map: Dict[str, str] = {
+        text_map: dict[str, str] = {
             "ro": CONFIG.ai_disclosure_ro,
             "ru": CONFIG.ai_disclosure_ru,
             "en": CONFIG.ai_disclosure_en,
@@ -123,7 +123,7 @@ class PredictionResult(BaseModel):
     reasoning: str = Field(..., description="Why they would respond this way")
     suggested_approach: str = Field(..., description="Better phrasing for a positive outcome")
     risk_level: str = Field("medium", description="low / medium / high — risk of negative reaction")
-    alternative_messages: List[str] = Field(
+    alternative_messages: list[str] = Field(
         default_factory=list,
         description="Two alternative phrasings to consider",
     )
@@ -144,8 +144,8 @@ class NegotiationResult(BaseModel):
     objective: str = Field(..., description="Original negotiation objective")
     outcome: str = Field(..., description="reached_agreement / partial_agreement / stalemate / rejected")
     agreement_summary: str = Field("", description="What was agreed (if anything)")
-    concessions_made: List[Concession] = Field(default_factory=list)
-    concessions_received: List[Concession] = Field(default_factory=list)
+    concessions_made: list[Concession] = Field(default_factory=list)
+    concessions_received: list[Concession] = Field(default_factory=list)
     contact_position: str = Field("", description="The user's final stated position")
     recommended_next_step: str = Field("", description="What to do next")
     confidence: float = Field(0.5, ge=0.0, le=1.0)
@@ -184,18 +184,18 @@ class SelfProfile:
 
     user_id: str
     name: str
-    username: Optional[str] = None
-    bio: Optional[str] = None
-    self_summary: Optional[str] = None
-    own_messages: List[str] = field(default_factory=list)
+    username: str | None = None
+    bio: str | None = None
+    self_summary: str | None = None
+    own_messages: list[str] = field(default_factory=list)
     language: str = "ro"
     custom_notes: str = ""
-    interests: List[str] = field(default_factory=list)
-    profession: Optional[str] = None
-    last_message_date: Optional[str] = None
+    interests: list[str] = field(default_factory=list)
+    profession: str | None = None
+    last_message_date: str | None = None
 
     # Optional pre-written vacation message used by the `vacation` mode.
-    vacation_message: Optional[str] = None
+    vacation_message: str | None = None
 
 
 # ======================================================================
@@ -215,7 +215,7 @@ class AuditLogEntry:
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     audit_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "audit_id": self.audit_id,
             "action": self.action,
@@ -265,12 +265,12 @@ class DigitalTwin:
     def __init__(
         self,
         profile: SelfProfile,
-        agent_profile: Optional[AgentProfile] = None,
-        llm_client: Optional[LLMClient] = None,
+        agent_profile: AgentProfile | None = None,
+        llm_client: LLMClient | None = None,
         memory_window: int = 20,
         ltm_compression_threshold: int = 10,
         default_disclosure_language: DisclosureLanguage = "ro",
-        audit_log_maxlen: Optional[int] = None,
+        audit_log_maxlen: int | None = None,
     ) -> None:
         """
         Initialize a self-twin Digital Twin.
@@ -300,22 +300,22 @@ class DigitalTwin:
         )
 
         # Cached system prompt
-        self._system_prompt: Optional[str] = None
+        self._system_prompt: str | None = None
 
         # Accuracy tracking
         self._accuracy_stats = AccuracyStats()
-        self._pending_predictions: Dict[str, Dict[str, Any]] = {}
+        self._pending_predictions: dict[str, dict[str, Any]] = {}
 
         # Simulation round counter
         self._current_round: int = 0
 
         # Revocation flag (AI Act Art 22 consideration)
         self._revoked: bool = False
-        self._revoked_at: Optional[str] = None
+        self._revoked_at: str | None = None
         self._revocation_reason: str = ""
 
         # Audit log queue (bounded)
-        self.audit_log: Deque[AuditLogEntry] = deque(
+        self.audit_log: deque[AuditLogEntry] = deque(
             maxlen=audit_log_maxlen or self.DEFAULT_AUDIT_LOG_MAXLEN,
         )
 
@@ -373,7 +373,7 @@ class DigitalTwin:
         emotion: str,
         mode: TwinMode,
         round_num: int,
-        language: Optional[DisclosureLanguage] = None,
+        language: DisclosureLanguage | None = None,
     ) -> TwinResponse:
         """
         Wrap a generated reply into a fully-formed TwinResponse with disclosure.
@@ -391,9 +391,7 @@ class DigitalTwin:
         lang: DisclosureLanguage = language or self.default_disclosure_language
         disclosure = TwinDisclosure.for_language(lang)
         verified = bool(
-            self.agent_profile
-            and self.agent_profile.attestation
-            and self.agent_profile.attestation.is_valid()
+            self.agent_profile and self.agent_profile.attestation and self.agent_profile.attestation.is_valid()
         )
         return TwinResponse(
             text=text,
@@ -451,7 +449,7 @@ class DigitalTwin:
     def refresh_profile(
         self,
         profile: SelfProfile,
-        agent_profile: Optional[AgentProfile] = None,
+        agent_profile: AgentProfile | None = None,
     ) -> None:
         """Update the self-profile and invalidate the cached system prompt."""
         self.profile = profile
@@ -466,9 +464,9 @@ class DigitalTwin:
         self,
         message: str,
         mode: TwinMode = "free_chat",
-        context: Optional[str] = None,
-        round_num: Optional[int] = None,
-        disclosure_language: Optional[DisclosureLanguage] = None,
+        context: str | None = None,
+        round_num: int | None = None,
+        disclosure_language: DisclosureLanguage | None = None,
     ) -> TwinResponse:
         """
         Send a message to the digital twin and get an in-character response.
@@ -538,7 +536,7 @@ class DigitalTwin:
         self,
         scenario: str,
         your_message: str,
-        round_num: Optional[int] = None,
+        round_num: int | None = None,
     ) -> PredictionResult:
         """Predict how the user would respond to a specific message."""
         self._ensure_active()
@@ -608,10 +606,10 @@ Return JSON:
     def negotiate(
         self,
         objective: str,
-        constraints: List[str],
+        constraints: list[str],
         max_rounds: int = 5,
-        context: Optional[str] = None,
-        round_num: Optional[int] = None,
+        context: str | None = None,
+        round_num: int | None = None,
     ) -> NegotiationResult:
         """Run a goal-oriented negotiation simulation from the user's seat."""
         self._ensure_active()
@@ -686,8 +684,8 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
 
     def update_from_new_data(
         self,
-        own_messages: List[str],
-        custom_notes: Optional[str] = None,
+        own_messages: list[str],
+        custom_notes: str | None = None,
     ) -> None:
         """Refresh the self-twin with new outgoing messages."""
         self.profile.own_messages = (self.profile.own_messages + own_messages)[-50:]
@@ -699,7 +697,9 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
         self._system_prompt = None
         logger.info(
             "Self-twin updated for %s: +%d messages, confidence=%.2f",
-            self.profile.name, len(own_messages), self.confidence_score,
+            self.profile.name,
+            len(own_messages),
+            self.confidence_score,
         )
 
     def confirm_prediction(self, prediction_id: str, was_correct: bool) -> AccuracyStats:
@@ -713,14 +713,9 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
         else:
             self._accuracy_stats.confirmed_incorrect += 1
 
-        total_confirmed = (
-            self._accuracy_stats.confirmed_correct
-            + self._accuracy_stats.confirmed_incorrect
-        )
+        total_confirmed = self._accuracy_stats.confirmed_correct + self._accuracy_stats.confirmed_incorrect
         if total_confirmed > 0:
-            self._accuracy_stats.accuracy_rate = round(
-                self._accuracy_stats.confirmed_correct / total_confirmed, 4
-            )
+            self._accuracy_stats.accuracy_rate = round(self._accuracy_stats.confirmed_correct / total_confirmed, 4)
 
         self._accuracy_stats.last_updated = datetime.now().isoformat()
         return self._accuracy_stats
@@ -735,7 +730,8 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
         """Serialize the audit log to JSON for compliance review."""
         return json.dumps(
             [e.to_dict() for e in self.audit_log],
-            ensure_ascii=False, indent=2,
+            ensure_ascii=False,
+            indent=2,
         )
 
     def reset_conversation(self) -> None:
@@ -743,7 +739,7 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
         self.memory.short_term.clear()
         logger.debug("Conversation reset for twin: %s", self.profile.name)
 
-    def tick(self, round_num: Optional[int] = None) -> None:
+    def tick(self, round_num: int | None = None) -> None:
         """Advance the twin's emotional state one simulation round."""
         if round_num is not None:
             self._current_round = round_num
@@ -756,13 +752,12 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
     def attach_attestation(self, attestation: VerifiedAttestation) -> None:
         """Attach an eIDAS Verified Authentic Twin attestation."""
         if self.agent_profile is None:
-            raise ValueError(
-                "Cannot attach attestation without an underlying AgentProfile"
-            )
+            raise ValueError("Cannot attach attestation without an underlying AgentProfile")
         self.agent_profile.attestation = attestation
         logger.info(
             "Attestation attached to twin for %s (verified=%s)",
-            self.profile.name, attestation.is_valid(),
+            self.profile.name,
+            attestation.is_valid(),
         )
 
     # ---- Internal --------------------------------------------------
@@ -770,11 +765,11 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
     def _build_message_stack(
         self,
         user_message: str,
-        context: Optional[str],
-        extra_system: Optional[str] = None,
-    ) -> List[Dict[str, str]]:
+        context: str | None,
+        extra_system: str | None = None,
+    ) -> list[dict[str, str]]:
         """Build the standard message stack for a chat call."""
-        messages: List[Dict[str, str]] = [
+        messages: list[dict[str, str]] = [
             {"role": "system", "content": self.system_prompt},
         ]
 
@@ -782,21 +777,25 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
             messages.append({"role": "system", "content": extra_system})
 
         if context:
-            messages.append({
-                "role": "system",
-                "content": f"[Additional context: {context}]",
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"[Additional context: {context}]",
+                }
+            )
 
         em = self.memory.emotion
         if em.current_emotion != Emotion.NEUTRAL.value:
-            messages.append({
-                "role": "system",
-                "content": (
-                    f"[Current emotional state: {em.current_emotion}, "
-                    f"intensity {em.current_intensity:.2f}. "
-                    f"Let this colour your response subtly.]"
-                ),
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        f"[Current emotional state: {em.current_emotion}, "
+                        f"intensity {em.current_intensity:.2f}. "
+                        f"Let this colour your response subtly.]"
+                    ),
+                }
+            )
 
         mem_ctx = self.memory.to_context_block()
         if mem_ctx.strip():
@@ -812,8 +811,8 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
     def _free_chat(
         self,
         user_message: str,
-        context: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        context: str | None = None,
+    ) -> tuple[str, str]:
         """Internal free-chat handler. Returns (response_text, detected_emotion)."""
         messages = self._build_message_stack(user_message, context)
         response = self.llm.chat(messages, temperature=0.8, max_tokens=1024)
@@ -822,8 +821,8 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
     def _auto_reply(
         self,
         user_message: str,
-        context: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        context: str | None = None,
+    ) -> tuple[str, str]:
         """
         Offline auto-reply handler.
 
@@ -843,8 +842,8 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
     def _business_reply(
         self,
         user_message: str,
-        context: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        context: str | None = None,
+    ) -> tuple[str, str]:
         """
         Business 24/7 corporate agent handler.
 
@@ -865,10 +864,7 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
         """Return a static vacation/away message."""
         if self.profile.vacation_message:
             return self.profile.vacation_message
-        return (
-            f"Salut! Sunt plecat in concediu. "
-            f"Voi reveni cu raspuns cand revin. Mesaj automat MD-Chat."
-        )
+        return "Salut! Sunt plecat in concediu. " "Voi reveni cu raspuns cand revin. Mesaj automat MD-Chat."
 
     def _build_system_prompt(self) -> str:
         """Construct the full system prompt from all available self data."""
@@ -886,7 +882,7 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
             uses_caps = uses_caps_rate < 0.5
             uses_emoji = any(c in "".join(own_msgs) for c in ":)😀😂🤣❤️👍🔥💪")
             short_msgs = sum(1 for t in own_msgs if len(t) < 30) / len(own_msgs)
-            parts: List[str] = [f"Average message length: {avg_len:.0f} chars"]
+            parts: list[str] = [f"Average message length: {avg_len:.0f} chars"]
             if short_msgs > 0.6:
                 parts.append("Writes VERY SHORT messages (1-2 sentences max)")
             if uses_caps:
@@ -910,14 +906,10 @@ Run {max_rounds} internal negotiation turns and return the FINAL result as JSON:
                     f"{cs.directness} directness, {cs.emotionality} emotionality"
                 )
             if ap.decision_factors:
-                items = "; ".join(
-                    f"{df.factor} (w={df.weight:.2f})" for df in ap.decision_factors[:5]
-                )
+                items = "; ".join(f"{df.factor} (w={df.weight:.2f})" for df in ap.decision_factors[:5])
                 decision_factors_text = f"\nDecision factors: {items}"
             if ap.influence_map:
-                items = "; ".join(
-                    f"{ie.target_name} ({ie.influence_type})" for ie in ap.influence_map[:5]
-                )
+                items = "; ".join(f"{ie.target_name} ({ie.influence_type})" for ie in ap.influence_map[:5])
                 influence_text = f"\nKnown influences: {items}"
 
         return f"""You are the self-twin (digital clone) of {p.name}, an MD-Chat user.
@@ -991,7 +983,7 @@ def _detect_emotion_from_text(text: str) -> str:
     the twin's emotional state after each interaction.
     """
     text_lower = text.lower()
-    markers: List[Tuple[str, List[str]]] = [
+    markers: list[tuple[str, list[str]]] = [
         (Emotion.ANGRY.value, ["angry", "unacceptable", "furious", "ridiculous", "enough"]),
         (Emotion.FRUSTRATED.value, ["frustrated", "again", "still", "not working", "tired of"]),
         (Emotion.EXCITED.value, ["amazing", "great", "love it", "fantastic", "perfect", "yes!"]),

@@ -22,7 +22,6 @@ from __future__ import annotations
 import logging
 import traceback
 import uuid
-from typing import Optional
 
 from flask import Flask, g, jsonify
 from werkzeug.exceptions import HTTPException
@@ -55,7 +54,7 @@ def _request_id() -> str:
         return str(uuid.uuid4())
 
 
-def _make_error_response(status_code: int, message: Optional[str] = None):
+def _make_error_response(status_code: int, message: str | None = None):
     body = {
         "error": message or _GENERIC_MESSAGES.get(status_code, "An error occurred"),
         "code": status_code,
@@ -82,7 +81,9 @@ class ErrorHandler:
             status = exc.code or 500
             logger.warning(
                 "HTTPException status=%d description=%s request_id=%s",
-                status, exc.description, _request_id(),
+                status,
+                exc.description,
+                _request_id(),
             )
             response = _make_error_response(status)
             if status == 429 and hasattr(exc, "response") and exc.response:
@@ -92,12 +93,15 @@ class ErrorHandler:
             return response
 
         for code in (400, 401, 403, 404, 405, 413, 422, 429):
+
             def _make_handler(c):
                 def _handler(exc):
                     logger.info("HTTP %d request_id=%s", c, _request_id())
                     return _make_error_response(c)
+
                 _handler.__name__ = f"handle_{c}"
                 return _handler
+
             app.register_error_handler(code, _make_handler(code))
 
         @app.errorhandler(Exception)
@@ -105,7 +109,10 @@ class ErrorHandler:
             tb = traceback.format_exc()
             logger.error(
                 "Unhandled exception request_id=%s type=%s: %s\n%s",
-                _request_id(), type(exc).__name__, str(exc), tb,
+                _request_id(),
+                type(exc).__name__,
+                str(exc),
+                tb,
             )
             if debug_mode:
                 message = f"{type(exc).__name__}: {exc}"

@@ -45,7 +45,7 @@ Edge types (8):
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 #: Allowed values for the privacy-tier marker placed on every node/edge.
 CONSENT_TIERS: tuple = ("public", "friends", "private")
@@ -55,7 +55,7 @@ CONSENT_TIERS: tuple = ("public", "friends", "private")
 # Pre-defined MD-Chat ontology
 # ---------------------------------------------------------------------------
 
-MDCHAT_ONTOLOGY: Dict[str, Any] = {
+MDCHAT_ONTOLOGY: dict[str, Any] = {
     "entity_types": [
         {
             "name": "User",
@@ -279,12 +279,12 @@ MDCHAT_ONTOLOGY: Dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 
-def is_valid_consent_tier(tier: Optional[str]) -> bool:
+def is_valid_consent_tier(tier: str | None) -> bool:
     """Return True if *tier* is one of ``public``, ``friends`` or ``private``."""
     return tier in CONSENT_TIERS
 
 
-def normalise_consent_tier(tier: Optional[str], default: str = "private") -> str:
+def normalise_consent_tier(tier: str | None, default: str = "private") -> str:
     """
     Return a valid consent tier or *default* if the input is missing/invalid.
 
@@ -356,7 +356,7 @@ class OntologyGenerator:
 
     MAX_TEXT_FOR_LLM: int = 50_000
 
-    def __init__(self, llm_client: Optional[Any] = None) -> None:
+    def __init__(self, llm_client: Any | None = None) -> None:
         """
         Args:
             llm_client: Optional LLM client. When ``None``, only
@@ -369,7 +369,7 @@ class OntologyGenerator:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def get_mdchat_ontology() -> Dict[str, Any]:
+    def get_mdchat_ontology() -> dict[str, Any]:
         """
         Return the canonical MD-Chat ontology without calling an LLM.
 
@@ -380,7 +380,7 @@ class OntologyGenerator:
 
     # Backwards-compat alias for code that referenced the Cronberry name.
     @staticmethod
-    def get_cronberry_ontology() -> Dict[str, Any]:
+    def get_cronberry_ontology() -> dict[str, Any]:
         """Deprecated alias for :meth:`get_mdchat_ontology`."""
         return OntologyGenerator.get_mdchat_ontology()
 
@@ -390,11 +390,11 @@ class OntologyGenerator:
 
     def generate(
         self,
-        document_texts: List[str],
+        document_texts: list[str],
         simulation_requirement: str,
-        additional_context: Optional[str] = None,
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        additional_context: str | None = None,
+        system_prompt: str | None = None,
+    ) -> dict[str, Any]:
         """
         Generate a custom ontology by analyzing document texts with an LLM.
 
@@ -410,27 +410,21 @@ class OntologyGenerator:
             and analysis_summary.
         """
         if self._llm_client is None:
-            raise RuntimeError(
-                "OntologyGenerator: no LLM client configured for generate()"
-            )
+            raise RuntimeError("OntologyGenerator: no LLM client configured for generate()")
 
-        user_message = self._build_user_message(
-            document_texts, simulation_requirement, additional_context
-        )
+        user_message = self._build_user_message(document_texts, simulation_requirement, additional_context)
         messages = [
             {"role": "system", "content": system_prompt or _LLM_SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
         ]
-        raw = self._llm_client.chat_json(
-            messages=messages, temperature=0.3, max_tokens=4096
-        )
+        raw = self._llm_client.chat_json(messages=messages, temperature=0.3, max_tokens=4096)
         return self._validate_and_process(raw)
 
     def _build_user_message(
         self,
-        document_texts: List[str],
+        document_texts: list[str],
         simulation_requirement: str,
-        additional_context: Optional[str],
+        additional_context: str | None,
     ) -> str:
         combined = "\n\n---\n\n".join(document_texts)
         original_len = len(combined)
@@ -438,8 +432,7 @@ class OntologyGenerator:
         if len(combined) > self.MAX_TEXT_FOR_LLM:
             combined = combined[: self.MAX_TEXT_FOR_LLM]
             combined += (
-                f"\n\n...(original {original_len} chars, "
-                f"truncated to {self.MAX_TEXT_FOR_LLM} for LLM analysis)..."
+                f"\n\n...(original {original_len} chars, " f"truncated to {self.MAX_TEXT_FOR_LLM} for LLM analysis)..."
             )
 
         msg = f"## Goal\n\n{simulation_requirement}\n\n## Document Content\n\n{combined}\n"
@@ -458,7 +451,7 @@ class OntologyGenerator:
         )
         return msg
 
-    def _validate_and_process(self, result: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_and_process(self, result: dict[str, Any]) -> dict[str, Any]:
         """Ensure the LLM response conforms to the expected schema."""
         result.setdefault("entity_types", [])
         result.setdefault("edge_types", [])
@@ -483,27 +476,31 @@ class OntologyGenerator:
 
         # Ensure Person / Organization fallback types exist at the end
         names = {e["name"] for e in result["entity_types"]}
-        fallbacks: List[Dict[str, Any]] = []
+        fallbacks: list[dict[str, Any]] = []
         if "Person" not in names:
-            fallbacks.append({
-                "name": "Person",
-                "description": "Any individual not fitting other specific person types.",
-                "attributes": [
-                    {"name": "full_name", "type": "text", "description": "Full name"},
-                    {"name": "role", "type": "text", "description": "Role or occupation"},
-                ],
-                "examples": ["ordinary contact", "anonymous participant"],
-            })
+            fallbacks.append(
+                {
+                    "name": "Person",
+                    "description": "Any individual not fitting other specific person types.",
+                    "attributes": [
+                        {"name": "full_name", "type": "text", "description": "Full name"},
+                        {"name": "role", "type": "text", "description": "Role or occupation"},
+                    ],
+                    "examples": ["ordinary contact", "anonymous participant"],
+                }
+            )
         if "Organization" not in names:
-            fallbacks.append({
-                "name": "Organization",
-                "description": "Any organization not fitting other specific types.",
-                "attributes": [
-                    {"name": "org_name", "type": "text", "description": "Organization name"},
-                    {"name": "org_type", "type": "text", "description": "Type of organization"},
-                ],
-                "examples": ["small business", "community group"],
-            })
+            fallbacks.append(
+                {
+                    "name": "Organization",
+                    "description": "Any organization not fitting other specific types.",
+                    "attributes": [
+                        {"name": "org_name", "type": "text", "description": "Organization name"},
+                        {"name": "org_type", "type": "text", "description": "Type of organization"},
+                    ],
+                    "examples": ["small business", "community group"],
+                }
+            )
 
         if fallbacks:
             current = len(result["entity_types"])

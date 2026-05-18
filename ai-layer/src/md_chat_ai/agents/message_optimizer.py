@@ -34,7 +34,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..llm.client import LLMClient
 from .digital_twin import DigitalTwin, SelfProfile, TwinResponse
@@ -63,13 +63,13 @@ class VariantTestResult:
 
     variant: MessageVariant
     twin_response: str
-    success_score: float        # 0-1
-    naturalness_score: float    # 0-1 (how natural does the message sound)
-    risk_score: float           # 0-1 (higher = more risky)
-    predicted_outcome: str      # "will_respond_positively", "will_ignore", "will_respond_negatively"
-    reasoning: str              # Why this score
+    success_score: float  # 0-1
+    naturalness_score: float  # 0-1 (how natural does the message sound)
+    risk_score: float  # 0-1 (higher = more risky)
+    predicted_outcome: str  # "will_respond_positively", "will_ignore", "will_respond_negatively"
+    reasoning: str  # Why this score
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "variant": {
                 "text": self.variant.text,
@@ -93,19 +93,19 @@ class OptimizationResult:
     user_id: str
     user_name: str
     objective: str
-    original_message: Optional[str]
+    original_message: str | None
 
-    variants_tested: List[VariantTestResult]
+    variants_tested: list[VariantTestResult]
 
-    winner: Optional[VariantTestResult] = None
-    runner_up: Optional[VariantTestResult] = None
-    do_not_send: List[VariantTestResult] = field(default_factory=list)
+    winner: VariantTestResult | None = None
+    runner_up: VariantTestResult | None = None
+    do_not_send: list[VariantTestResult] = field(default_factory=list)
 
     confidence: float = 0.0
     estimated_success_rate: float = 0.0
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "user_id": self.user_id,
             "user_name": self.user_name,
@@ -129,9 +129,9 @@ class OptimizationResult:
 class MessageOptimizer:
     """Optimize messages before sending — backed by the user's self-twin."""
 
-    def __init__(self, llm_client: Optional[LLMClient] = None) -> None:
+    def __init__(self, llm_client: LLMClient | None = None) -> None:
         self._llm = llm_client
-        self._history: List[Dict[str, Any]] = []
+        self._history: list[dict[str, Any]] = []
 
     @property
     def llm(self) -> LLMClient:
@@ -148,9 +148,9 @@ class MessageOptimizer:
         self,
         self_profile: SelfProfile,
         objective: str,
-        draft_message: Optional[str] = None,
+        draft_message: str | None = None,
         num_variants: int = 5,
-        constraints: Optional[List[str]] = None,
+        constraints: list[str] | None = None,
     ) -> OptimizationResult:
         """
         Optimize a message for a specific user using their self-twin.
@@ -171,11 +171,9 @@ class MessageOptimizer:
             num_variants,
         )
 
-        variants = self._generate_variants(
-            self_profile, objective, draft_message, num_variants, constraints
-        )
+        variants = self._generate_variants(self_profile, objective, draft_message, num_variants, constraints)
 
-        test_results: List[VariantTestResult] = []
+        test_results: list[VariantTestResult] = []
         for variant in variants:
             try:
                 result = self._test_variant_on_twin(twin, variant, objective)
@@ -187,33 +185,27 @@ class MessageOptimizer:
         winner, runner_up = self._select_winner(test_results)
 
         do_not_send = [
-            r for r in test_results
-            if r.risk_score > 0.7 or r.predicted_outcome == "will_respond_negatively"
+            r for r in test_results if r.risk_score > 0.7 or r.predicted_outcome == "will_respond_negatively"
         ]
 
         confidence = self._calculate_confidence(test_results, winner)
 
-        warnings: List[str] = []
+        warnings: list[str] = []
         if twin.confidence_score < 0.3:
-            warnings.append(
-                f"Low profile confidence ({twin.confidence_score:.2f}). "
-                "Predictions may be unreliable."
-            )
+            warnings.append(f"Low profile confidence ({twin.confidence_score:.2f}). " "Predictions may be unreliable.")
         if winner and winner.success_score < 0.4:
             warnings.append(
-                "Even the best variant has a low success score. "
-                "Consider revising the objective or timing."
+                "Even the best variant has a low success score. " "Consider revising the objective or timing."
             )
         if len(do_not_send) > len(test_results) / 2:
-            warnings.append(
-                "Most variants were flagged as risky. "
-                "This recipient may not be receptive right now."
-            )
+            warnings.append("Most variants were flagged as risky. " "This recipient may not be receptive right now.")
 
         duration = time.monotonic() - t0
         logger.info(
             "Optimization complete for %s in %.1fs: %d variants tested",
-            self_profile.name, duration, len(test_results),
+            self_profile.name,
+            duration,
+            len(test_results),
         )
 
         return OptimizationResult(
@@ -240,7 +232,7 @@ class MessageOptimizer:
         objective: str,
         message_a: str,
         message_b: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Head-to-head test of two specific messages against the self-twin."""
         twin = DigitalTwin(self_profile)
 
@@ -261,16 +253,8 @@ class MessageOptimizer:
         )
         result_b = self._test_variant_on_twin(twin, variant_b, objective)
 
-        score_a = (
-            result_a.success_score * 0.5
-            + result_a.naturalness_score * 0.3
-            - result_a.risk_score * 0.2
-        )
-        score_b = (
-            result_b.success_score * 0.5
-            + result_b.naturalness_score * 0.3
-            - result_b.risk_score * 0.2
-        )
+        score_a = result_a.success_score * 0.5 + result_a.naturalness_score * 0.3 - result_a.risk_score * 0.2
+        score_b = result_b.success_score * 0.5 + result_b.naturalness_score * 0.3 - result_b.risk_score * 0.2
 
         winner_label = "A" if score_a >= score_b else "B"
         margin = abs(score_a - score_b)
@@ -300,8 +284,7 @@ class MessageOptimizer:
                 "reasoning": result_b.reasoning,
             },
             "recommendation": (
-                f"Send message {winner_label}. "
-                + (result_a.reasoning if winner_label == "A" else result_b.reasoning)
+                f"Send message {winner_label}. " + (result_a.reasoning if winner_label == "A" else result_b.reasoning)
             ),
         }
 
@@ -311,9 +294,9 @@ class MessageOptimizer:
 
     def optimize_batch(
         self,
-        items: List[Dict[str, Any]],
+        items: list[dict[str, Any]],
         num_variants: int = 3,
-    ) -> List[OptimizationResult]:
+    ) -> list[OptimizationResult]:
         """
         Optimize messages for multiple users at once.
 
@@ -322,7 +305,7 @@ class MessageOptimizer:
             - "objective": str
             - "draft": Optional[str]
         """
-        results: List[OptimizationResult] = []
+        results: list[OptimizationResult] = []
 
         for item in items:
             profile = item.get("profile")
@@ -369,10 +352,12 @@ class MessageOptimizer:
 
         logger.info(
             "Recorded outcome for user %s: success=%s (history size: %d)",
-            user_id, was_successful, len(self._history),
+            user_id,
+            was_successful,
+            len(self._history),
         )
 
-    def get_history(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_history(self, user_id: str | None = None) -> list[dict[str, Any]]:
         """Retrieve recorded outcomes, optionally filtered by user."""
         if user_id:
             return [h for h in self._history if h["user_id"] == user_id]
@@ -386,12 +371,12 @@ class MessageOptimizer:
         self,
         profile: SelfProfile,
         objective: str,
-        draft: Optional[str],
+        draft: str | None,
         num: int,
-        constraints: Optional[List[str]],
-    ) -> List[MessageVariant]:
+        constraints: list[str] | None,
+    ) -> list[MessageVariant]:
         """Generate message variants using LLM."""
-        known_facts: List[str] = []
+        known_facts: list[str] = []
         if profile.bio:
             known_facts.append(f"Bio: {profile.bio}")
         if profile.self_summary:
@@ -405,16 +390,14 @@ class MessageOptimizer:
 
         constraints_block = ""
         if constraints:
-            constraints_block = "\nCONSTRAINTS:\n" + "\n".join(
-                f"- {c}" for c in constraints
-            )
+            constraints_block = "\nCONSTRAINTS:\n" + "\n".join(f"- {c}" for c in constraints)
 
         past = [h for h in self._history if h["user_id"] == profile.user_id]
         history_block = ""
         if past:
             successful = [h for h in past if h["was_successful"]]
             failed = [h for h in past if not h["was_successful"]]
-            history_parts: List[str] = []
+            history_parts: list[str] = []
             if successful:
                 history_parts.append(
                     "Previously SUCCESSFUL messages: "
@@ -422,8 +405,7 @@ class MessageOptimizer:
                 )
             if failed:
                 history_parts.append(
-                    "Previously FAILED messages: "
-                    + "; ".join(f'"{h["message_sent"][:100]}"' for h in failed[-3:])
+                    "Previously FAILED messages: " + "; ".join(f'"{h["message_sent"][:100]}"' for h in failed[-3:])
                 )
             history_block = "\n\nLEARNING FROM PAST:\n" + "\n".join(history_parts)
 
@@ -541,7 +523,7 @@ RULES:
         variant: MessageVariant,
         twin_response: str,
         user_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Use LLM to score a variant's performance against the twin."""
         prompt = f"""Evaluate this message variant tested on {user_name}'s self-twin.
 
@@ -588,18 +570,14 @@ Score this interaction and return JSON:
 
     def _select_winner(
         self,
-        results: List[VariantTestResult],
-    ) -> Tuple[Optional[VariantTestResult], Optional[VariantTestResult]]:
+        results: list[VariantTestResult],
+    ) -> tuple[VariantTestResult | None, VariantTestResult | None]:
         """Select best variant based on composite score."""
         if not results:
             return None, None
 
         def composite(r: VariantTestResult) -> float:
-            return (
-                r.success_score * 0.5
-                + r.naturalness_score * 0.3
-                - r.risk_score * 0.2
-            )
+            return r.success_score * 0.5 + r.naturalness_score * 0.3 - r.risk_score * 0.2
 
         ranked = sorted(results, key=composite, reverse=True)
         winner = ranked[0]
@@ -608,8 +586,8 @@ Score this interaction and return JSON:
 
     def _calculate_confidence(
         self,
-        results: List[VariantTestResult],
-        winner: Optional[VariantTestResult],
+        results: list[VariantTestResult],
+        winner: VariantTestResult | None,
     ) -> float:
         """Calculate overall confidence in the optimization."""
         if not results or not winner:

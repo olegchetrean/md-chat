@@ -27,8 +27,9 @@ SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 from pydantic import ValidationError

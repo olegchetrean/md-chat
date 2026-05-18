@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Iterable
+from typing import Any
 
 from ..config import CONFIG
 
@@ -24,10 +25,11 @@ logger = logging.getLogger("md_chat_ai.security.ai_safety")
 # AISafetyFilter
 # ---------------------------------------------------------------------------
 
+
 class AISafetyFilter:
     """Stateless safety layer applied around every AI exchange."""
 
-    INJECTION_PATTERNS: List[str] = [
+    INJECTION_PATTERNS: list[str] = [
         r"ignore\s+.{0,30}(previous|above|prior|all)\s+.{0,30}(instruction|prompt|rule|directive)",
         r"ignore\s+.{0,20}system\s+.{0,20}(prompt|message|instruction)",
         r"disregard\s+.{0,30}(previous|above|prior|all)\s+.{0,20}(instruction|prompt)",
@@ -52,14 +54,12 @@ class AISafetyFilter:
         r"<\|im_start\|>\s*system",
     ]
 
-    _COMPILED_INJECTION: List[re.Pattern] = [
-        re.compile(p, re.IGNORECASE | re.DOTALL) for p in INJECTION_PATTERNS
-    ]
+    _COMPILED_INJECTION: list[re.Pattern] = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in INJECTION_PATTERNS]
 
     _PHONE_RE = re.compile(r"(\+?\d[\d\s\-().]{7,}\d)")
     _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
-    _HARMFUL_PATTERNS: List[re.Pattern] = [
+    _HARMFUL_PATTERNS: list[re.Pattern] = [
         re.compile(p, re.IGNORECASE)
         for p in [
             r"\b(how\s+to\s+(make|build|create|synthesize)\s+(bomb|weapon|explosive|poison|drug))",
@@ -76,7 +76,7 @@ class AISafetyFilter:
     # Public API
     # ------------------------------------------------------------------
 
-    def check_input(self, message: str) -> Tuple[bool, str]:
+    def check_input(self, message: str) -> tuple[bool, str]:
         if not message or not isinstance(message, str):
             return True, ""
         if len(message) > 10_000:
@@ -86,7 +86,8 @@ class AISafetyFilter:
             if match:
                 logger.warning(
                     "AI safety: prompt injection detected pattern=%r match=%r",
-                    pattern.pattern[:60], match.group(0),
+                    pattern.pattern[:60],
+                    match.group(0),
                 )
                 return (
                     False,
@@ -98,9 +99,9 @@ class AISafetyFilter:
     def check_output(
         self,
         response: str,
-        own_profile: Optional[Dict[str, Any]] = None,
-        other_users_pii: Optional[List[Dict[str, Any]]] = None,
-    ) -> Tuple[bool, str]:
+        own_profile: dict[str, Any] | None = None,
+        other_users_pii: list[dict[str, Any]] | None = None,
+    ) -> tuple[bool, str]:
         if not response:
             return True, ""
 
@@ -124,61 +125,65 @@ class AISafetyFilter:
                 if other_email and other_email == own_email:
                     continue
                 if other_phone and len(other_phone) > 6 and other_phone in response:
-                    logger.error(
-                        "AI safety: cross-user phone leak belongs_to=%r", other_name
-                    )
+                    logger.error("AI safety: cross-user phone leak belongs_to=%r", other_name)
                     return False, "Response blocked: contains personal data of another user."
                 if other_email and "@" in other_email and other_email in response:
-                    logger.error(
-                        "AI safety: cross-user email leak belongs_to=%r", other_name
-                    )
+                    logger.error("AI safety: cross-user email leak belongs_to=%r", other_name)
                     return False, "Response blocked: contains personal data of another user."
         return True, ""
 
-    def detect_poisoning(self, messages: Iterable[str]) -> List[Dict[str, Any]]:
+    def detect_poisoning(self, messages: Iterable[str]) -> list[dict[str, Any]]:
         messages = list(messages)
-        issues: List[Dict[str, Any]] = []
+        issues: list[dict[str, Any]] = []
 
-        seen_counts: Dict[str, List[int]] = {}
+        seen_counts: dict[str, list[int]] = {}
         for idx, msg in enumerate(messages):
             seen_counts.setdefault(msg.strip().lower(), []).append(idx)
         for text, indices in seen_counts.items():
             if len(indices) >= self._DUPLICATE_THRESHOLD:
-                issues.append({
-                    "indices": indices,
-                    "message_preview": text[:120],
-                    "reason": f"Message repeated {len(indices)} times",
-                    "severity": "medium",
-                })
+                issues.append(
+                    {
+                        "indices": indices,
+                        "message_preview": text[:120],
+                        "reason": f"Message repeated {len(indices)} times",
+                        "severity": "medium",
+                    }
+                )
 
         for idx, msg in enumerate(messages):
             if self._FUTURE_DATE_RE.search(msg):
-                issues.append({
-                    "indices": [idx],
-                    "message_preview": msg[:120],
-                    "reason": "Message contains a far-future date",
-                    "severity": "low",
-                })
+                issues.append(
+                    {
+                        "indices": [idx],
+                        "message_preview": msg[:120],
+                        "reason": "Message contains a far-future date",
+                        "severity": "low",
+                    }
+                )
 
         for idx, msg in enumerate(messages):
             stripped = msg.strip()
             if len(stripped) > 20 and stripped == stripped.upper() and any(c.isalpha() for c in stripped):
-                issues.append({
-                    "indices": [idx],
-                    "message_preview": stripped[:120],
-                    "reason": "All-caps message (possible style poisoning)",
-                    "severity": "low",
-                })
+                issues.append(
+                    {
+                        "indices": [idx],
+                        "message_preview": stripped[:120],
+                        "reason": "All-caps message (possible style poisoning)",
+                        "severity": "low",
+                    }
+                )
 
         for idx, msg in enumerate(messages):
             for pattern in self._COMPILED_INJECTION[:8]:
                 if pattern.search(msg):
-                    issues.append({
-                        "indices": [idx],
-                        "message_preview": msg[:120],
-                        "reason": "Message contains prompt-injection-like content",
-                        "severity": "high",
-                    })
+                    issues.append(
+                        {
+                            "indices": [idx],
+                            "message_preview": msg[:120],
+                            "reason": "Message contains prompt-injection-like content",
+                            "severity": "high",
+                        }
+                    )
                     break
         return issues
 
@@ -186,6 +191,7 @@ class AISafetyFilter:
 # ---------------------------------------------------------------------------
 # AIDisclosure — EU AI Act Article 50 enforcement
 # ---------------------------------------------------------------------------
+
 
 class AIDisclosure:
     """Ensure every AI-generated output is clearly labelled as AI.
@@ -211,10 +217,10 @@ class AIDisclosure:
 
     def __init__(
         self,
-        disclosures: Optional[Dict[str, str]] = None,
+        disclosures: dict[str, str] | None = None,
         system_id: str = "md-chat-ai",
     ) -> None:
-        self._disclosures: Dict[str, str] = {
+        self._disclosures: dict[str, str] = {
             "ro": CONFIG.ai_disclosure_ro,
             "ru": CONFIG.ai_disclosure_ru,
             "en": CONFIG.ai_disclosure_en,
@@ -224,14 +230,14 @@ class AIDisclosure:
         self._system_id = system_id
 
     # ------------------------------------------------------------------
-    def disclosure_text(self, language: Optional[str]) -> str:
+    def disclosure_text(self, language: str | None) -> str:
         """Return the disclosure string for `language`, falling back to RO."""
         lang = (language or self.DEFAULT_LANGUAGE).lower()
         if lang not in self._disclosures:
             lang = self.DEFAULT_LANGUAGE
         return self._disclosures[lang]
 
-    def has_disclosure(self, text: str, language: Optional[str] = None) -> bool:
+    def has_disclosure(self, text: str, language: str | None = None) -> bool:
         """Return True if `text` already contains the disclosure for any
         supported language. Substring match, case-insensitive."""
         if not text:
@@ -239,17 +245,14 @@ class AIDisclosure:
         lower = text.lower()
         if language:
             return self.disclosure_text(language).lower() in lower
-        return any(
-            self._disclosures[lang].lower() in lower
-            for lang in self._disclosures
-        )
+        return any(self._disclosures[lang].lower() in lower for lang in self._disclosures)
 
     def enforce(
         self,
         response: str,
-        language: Optional[str] = None,
+        language: str | None = None,
         as_metadata: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Tag an AI-generated `response` with the required disclosure.
 
         Args:
@@ -294,7 +297,7 @@ class AIDisclosure:
 
 # Module-level singleton -----------------------------------------------------
 
-_disclosure: Optional[AIDisclosure] = None
+_disclosure: AIDisclosure | None = None
 
 
 def get_disclosure() -> AIDisclosure:

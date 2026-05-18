@@ -122,18 +122,17 @@ class TriageDecision:
     """Optional structured details for the audit register."""
 
 
-def _check_authority_state(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_authority_state(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     state = (order.member_state or "").upper()
     if state and state not in _REGULATION_MEMBER_STATES:
         return (
             RefusalGround.NON_EU_AUTHORITY,
-            f"Issuing state {state!r} is not bound by EU 2023/1543; "
-            "re-route through MLAT / Budapest Convention.",
+            f"Issuing state {state!r} is not bound by EU 2023/1543; " "re-route through MLAT / Budapest Convention.",
         )
     return None
 
 
-def _check_authority_competence(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_authority_competence(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     if (
         order.issuing_authority_type == "administrative"
         and order.requested_data_category in _CONTENT_TRAFFIC_CATEGORIES
@@ -146,7 +145,7 @@ def _check_authority_competence(order: "ProductionOrder") -> tuple[RefusalGround
     return None
 
 
-def _check_form_compliance(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_form_compliance(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     if not order.legal_basis or len(order.legal_basis.strip()) < 16:
         return (
             RefusalGround.NON_COMPLIANT_FORM,
@@ -161,7 +160,7 @@ def _check_form_compliance(order: "ProductionOrder") -> tuple[RefusalGround, str
     return None
 
 
-def _check_extraterritorial(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_extraterritorial(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     target_country = (order.target_country or "").upper()
     state = (order.member_state or "").upper()
     if target_country and state and target_country != state and target_country != "EU":
@@ -174,7 +173,7 @@ def _check_extraterritorial(order: "ProductionOrder") -> tuple[RefusalGround, st
     return None
 
 
-def _check_third_country_conflict(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_third_country_conflict(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     if order.target_country and order.target_country.upper() in {"US", "GB", "CH"}:
         if order.requested_data_category == "content":
             return (
@@ -185,7 +184,7 @@ def _check_third_country_conflict(order: "ProductionOrder") -> tuple[RefusalGrou
     return None
 
 
-def _check_immunities(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_immunities(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     flags = {f.lower() for f in order.subject_flags}
     if "lawyer" in flags or "attorney" in flags:
         return (
@@ -200,7 +199,7 @@ def _check_immunities(order: "ProductionOrder") -> tuple[RefusalGround, str] | N
     return None
 
 
-def _check_press(order: "ProductionOrder") -> tuple[RefusalGround, str] | None:
+def _check_press(order: ProductionOrder) -> tuple[RefusalGround, str] | None:
     flags = {f.lower() for f in order.subject_flags}
     if "journalist" in flags or "press" in flags:
         return (
@@ -221,7 +220,7 @@ _CHECKS = (
 )
 
 
-def triage_order(order: "ProductionOrder") -> TriageDecision:
+def triage_order(order: ProductionOrder) -> TriageDecision:
     """Run the Art. 12 decision tree against ``order``.
 
     The returned :class:`TriageDecision` is purely advisory — the portal

@@ -30,9 +30,10 @@ from __future__ import annotations
 import logging
 import random
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from ..config import CONFIG  # noqa: F401  (kept for future config-driven defaults)
 from ..llm.client import LLMClient
@@ -49,16 +50,16 @@ logger = logging.getLogger("md_chat_ai.agents.profile")
 class CommunicationStyle:
     """Detailed communication style traits derived from message analysis."""
 
-    formality: str = "neutral"          # very_formal / formal / neutral / casual / very_casual
-    directness: str = "balanced"        # very_direct / direct / balanced / indirect / very_indirect
-    emotionality: str = "balanced"      # stoic / reserved / balanced / expressive / very_expressive
-    response_speed: str = "normal"      # instant / quick / normal / slow / unpredictable
-    typical_length: str = "medium"      # short / medium / long / variable
-    emoji_usage: str = "moderate"       # none / sparse / moderate / heavy
-    preferred_channel: str = "text"     # text / voice / mixed
-    language_style: str = "standard"    # slang / standard / formal / technical / mixed
+    formality: str = "neutral"  # very_formal / formal / neutral / casual / very_casual
+    directness: str = "balanced"  # very_direct / direct / balanced / indirect / very_indirect
+    emotionality: str = "balanced"  # stoic / reserved / balanced / expressive / very_expressive
+    response_speed: str = "normal"  # instant / quick / normal / slow / unpredictable
+    typical_length: str = "medium"  # short / medium / long / variable
+    emoji_usage: str = "moderate"  # none / sparse / moderate / heavy
+    preferred_channel: str = "text"  # text / voice / mixed
+    language_style: str = "standard"  # slang / standard / formal / technical / mixed
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "formality": self.formality,
             "directness": self.directness,
@@ -71,7 +72,7 @@ class CommunicationStyle:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "CommunicationStyle":
+    def from_dict(cls, d: dict[str, Any]) -> CommunicationStyle:
         return cls(
             formality=d.get("formality", "neutral"),
             directness=d.get("directness", "balanced"),
@@ -90,10 +91,10 @@ class ResponsePattern:
 
     trigger: str
     pattern: str
-    frequency: str = "sometimes"        # always / often / sometimes / rarely
+    frequency: str = "sometimes"  # always / often / sometimes / rarely
     emotional_valence: str = "neutral"  # positive / neutral / negative
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "trigger": self.trigger,
             "pattern": self.pattern,
@@ -111,7 +112,7 @@ class DecisionFactor:
     direction: str = "positive"
     notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "factor": self.factor,
             "weight": self.weight,
@@ -130,7 +131,7 @@ class InfluenceEdge:
     bidirectional: bool = False
     notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target_name": self.target_name,
             "influence_type": self.influence_type,
@@ -151,12 +152,12 @@ class VerifiedAttestation:
     this is just the data carrier.
     """
 
-    issuer: str = ""                     # eIDAS QTSP or self-attested
-    subject_did: str = ""                # DID of the user the twin belongs to
+    issuer: str = ""  # eIDAS QTSP or self-attested
+    subject_did: str = ""  # DID of the user the twin belongs to
     signature_alg: str = "EdDSA"
-    signature: str = ""                  # base64 of the attestation signature
-    issued_at: Optional[str] = None
-    expires_at: Optional[str] = None
+    signature: str = ""  # base64 of the attestation signature
+    issued_at: str | None = None
+    expires_at: str | None = None
     revoked: bool = False
     revocation_reason: str = ""
 
@@ -175,7 +176,7 @@ class VerifiedAttestation:
                 return False
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "issuer": self.issuer,
             "subject_did": self.subject_did,
@@ -188,7 +189,7 @@ class VerifiedAttestation:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "VerifiedAttestation":
+    def from_dict(cls, d: dict[str, Any]) -> VerifiedAttestation:
         return cls(
             issuer=d.get("issuer", ""),
             subject_did=d.get("subject_did", ""),
@@ -218,40 +219,42 @@ class AgentProfile:
     persona: str  # Long-form personality description (200-400 words)
 
     # Big Five personality traits (0.0 to 1.0)
-    personality: Dict[str, float] = field(default_factory=lambda: {
-        "openness": 0.5,
-        "conscientiousness": 0.5,
-        "extraversion": 0.5,
-        "agreeableness": 0.5,
-        "neuroticism": 0.5,
-    })
+    personality: dict[str, float] = field(
+        default_factory=lambda: {
+            "openness": 0.5,
+            "conscientiousness": 0.5,
+            "extraversion": 0.5,
+            "agreeableness": 0.5,
+            "neuroticism": 0.5,
+        }
+    )
 
     # Communication style
     communication_style: CommunicationStyle = field(default_factory=CommunicationStyle)
 
     # Observed response patterns
-    response_patterns: List[ResponsePattern] = field(default_factory=list)
+    response_patterns: list[ResponsePattern] = field(default_factory=list)
 
     # Decision-making factors
-    decision_factors: List[DecisionFactor] = field(default_factory=list)
+    decision_factors: list[DecisionFactor] = field(default_factory=list)
 
     # Social influence map (people the user trusts / follows / opposes)
-    influence_map: List[InfluenceEdge] = field(default_factory=list)
+    influence_map: list[InfluenceEdge] = field(default_factory=list)
 
     # Demographics (self-declared)
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    profession: Optional[str] = None
-    interests: List[str] = field(default_factory=list)
+    age: int | None = None
+    gender: str | None = None
+    profession: str | None = None
+    interests: list[str] = field(default_factory=list)
     language: str = "ro"
 
     # Behavioral metrics derived from actual data
     message_count: int = 0
-    avg_message_length: int = 0           # chars
-    response_rate: float = 1.0            # fraction of messages that got reply
-    topics_distribution: Dict[str, float] = field(default_factory=dict)
+    avg_message_length: int = 0  # chars
+    response_rate: float = 1.0  # fraction of messages that got reply
+    topics_distribution: dict[str, float] = field(default_factory=dict)
     sentiment_trend: str = "stable"
-    peak_activity_hours: List[int] = field(default_factory=list)
+    peak_activity_hours: list[int] = field(default_factory=list)
 
     # Data quality
     data_confidence: float = 0.5
@@ -262,10 +265,10 @@ class AgentProfile:
     activity_level: float = 0.5
 
     # Source reference (the user's own account)
-    source_user_id: Optional[str] = None
+    source_user_id: str | None = None
 
     # eIDAS-backed authenticity attestation (Sprint 6 will populate it)
-    attestation: Optional[VerifiedAttestation] = None
+    attestation: VerifiedAttestation | None = None
 
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -274,7 +277,7 @@ class AgentProfile:
         """True iff a valid Verified Authentic Twin attestation is attached."""
         return self.attestation is not None and self.attestation.is_valid()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "agent_id": self.agent_id,
@@ -308,16 +311,13 @@ class AgentProfile:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "AgentProfile":
+    def from_dict(cls, d: dict[str, Any]) -> AgentProfile:
         """Deserialize from dictionary."""
         cs = CommunicationStyle.from_dict(d.get("communication_style", {}))
         rps = [ResponsePattern(**rp) for rp in d.get("response_patterns", [])]
         dfs = [DecisionFactor(**df) for df in d.get("decision_factors", [])]
         ims = [InfluenceEdge(**ie) for ie in d.get("influence_map", [])]
-        att = (
-            VerifiedAttestation.from_dict(d["attestation"])
-            if d.get("attestation") else None
-        )
+        att = VerifiedAttestation.from_dict(d["attestation"]) if d.get("attestation") else None
         return cls(
             agent_id=d["agent_id"],
             username=d["username"],
@@ -436,7 +436,7 @@ Return JSON:
 }}
 """
 
-    def __init__(self, llm_client: Optional[LLMClient] = None) -> None:
+    def __init__(self, llm_client: LLMClient | None = None) -> None:
         self._llm_client = llm_client
 
     @property
@@ -453,7 +453,7 @@ Return JSON:
     def generate_from_self(
         self,
         agent_id: int,
-        self_data: Dict[str, Any],
+        self_data: dict[str, Any],
         use_llm: bool = True,
     ) -> AgentProfile:
         """
@@ -488,12 +488,12 @@ Return JSON:
 
     def generate_batch(
         self,
-        users: List[Dict[str, Any]],
+        users: list[dict[str, Any]],
         use_llm: bool = True,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None,
-    ) -> List[AgentProfile]:
+        progress_callback: Callable[[int, int, str], None] | None = None,
+    ) -> list[AgentProfile]:
         """Generate self-twin profiles for a batch of users."""
-        profiles: List[AgentProfile] = []
+        profiles: list[AgentProfile] = []
         total = len(users)
 
         for i, self_data in enumerate(users):
@@ -523,8 +523,8 @@ Return JSON:
     def _generate_with_llm(
         self,
         agent_id: int,
-        self_data: Dict[str, Any],
-        behavioral: Dict[str, Any],
+        self_data: dict[str, Any],
+        behavioral: dict[str, Any],
     ) -> AgentProfile:
         """Call LLM to produce a rich self-persona from the user's own messages."""
         name = self_data.get(
@@ -554,14 +554,8 @@ Return JSON:
             return self._generate_rule_based(agent_id, self_data)
 
         cs = CommunicationStyle.from_dict(result.get("communication_style", {}))
-        rps = [
-            ResponsePattern(**_safe_pattern(rp))
-            for rp in result.get("response_patterns", [])
-        ]
-        dfs = [
-            DecisionFactor(**_safe_decision_factor(df))
-            for df in result.get("decision_factors", [])
-        ]
+        rps = [ResponsePattern(**_safe_pattern(rp)) for rp in result.get("response_patterns", [])]
+        dfs = [DecisionFactor(**_safe_decision_factor(df)) for df in result.get("decision_factors", [])]
 
         username = self_data.get("username") or _make_username(name)
 
@@ -596,7 +590,7 @@ Return JSON:
     def _generate_rule_based(
         self,
         agent_id: int,
-        self_data: Dict[str, Any],
+        self_data: dict[str, Any],
     ) -> AgentProfile:
         """Heuristic self-profile derivation from message length only."""
         name = self_data.get(
@@ -661,21 +655,23 @@ Return JSON:
 
     def _compute_behavioral_metrics(
         self,
-        self_data: Dict[str, Any],
+        self_data: dict[str, Any],
         use_llm: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculate behavioral metrics from the user's own outgoing messages."""
         own_msgs = self_data.get("own_messages", [])
         # Accept either list of strings OR list of {date, text} dicts.
-        normalised: List[Dict[str, Any]] = []
+        normalised: list[dict[str, Any]] = []
         for m in own_msgs:
             if isinstance(m, str):
                 normalised.append({"text": m, "date": ""})
             elif isinstance(m, dict):
-                normalised.append({
-                    "text": m.get("text", ""),
-                    "date": m.get("date", ""),
-                })
+                normalised.append(
+                    {
+                        "text": m.get("text", ""),
+                        "date": m.get("date", ""),
+                    }
+                )
 
         if normalised:
             avg_len = int(sum(len(m["text"]) for m in normalised) / len(normalised))
@@ -684,7 +680,7 @@ Return JSON:
 
         peak_hours = self._extract_peak_hours(normalised)
 
-        metrics: Dict[str, Any] = {
+        metrics: dict[str, Any] = {
             "avg_message_length": avg_len,
             "peak_activity_hours": peak_hours,
             "sentiment_trend": "stable",
@@ -694,7 +690,8 @@ Return JSON:
         if use_llm and len(normalised) >= 5:
             try:
                 msg_samples = self._format_message_samples(
-                    [m["text"] for m in normalised], max_count=40,
+                    [m["text"] for m in normalised],
+                    max_count=40,
                 )
                 prompt = self.BEHAVIORAL_METRICS_PROMPT.format(
                     n_messages=len(normalised),
@@ -715,7 +712,7 @@ Return JSON:
         return metrics
 
     @staticmethod
-    def _compute_data_confidence(self_data: Dict[str, Any]) -> float:
+    def _compute_data_confidence(self_data: dict[str, Any]) -> float:
         """
         Compute a 0.0-1.0 confidence score based on data availability.
 
@@ -741,9 +738,9 @@ Return JSON:
         return round(min(1.0, score), 3)
 
     @staticmethod
-    def _extract_peak_hours(messages: List[Dict[str, Any]]) -> List[int]:
+    def _extract_peak_hours(messages: list[dict[str, Any]]) -> list[int]:
         """Extract the top-3 most active hours from message timestamps."""
-        hour_counts: Dict[int, int] = {}
+        hour_counts: dict[int, int] = {}
         for msg in messages:
             date_str = msg.get("date", "")
             if not date_str:
@@ -761,12 +758,12 @@ Return JSON:
 
     @staticmethod
     def _format_message_samples(
-        messages: List[Any],
+        messages: list[Any],
         max_count: int = 30,
     ) -> str:
         """Format outgoing messages for inclusion in a prompt."""
         sample = messages[-max_count:] if len(messages) > max_count else messages
-        lines: List[str] = []
+        lines: list[str] = []
         for m in sample:
             if isinstance(m, str):
                 lines.append(f"- {m[:200]}")
@@ -795,10 +792,10 @@ def _make_username(name: str) -> str:
     return (slug or "user")[:32]
 
 
-def _parse_personality(raw: Dict[str, Any]) -> Dict[str, float]:
+def _parse_personality(raw: dict[str, Any]) -> dict[str, float]:
     """Parse and clamp Big Five personality traits."""
     traits = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]
-    result: Dict[str, float] = {}
+    result: dict[str, float] = {}
     for t in traits:
         try:
             result[t] = round(max(0.0, min(1.0, float(raw.get(t, 0.5)))), 3)
@@ -807,7 +804,7 @@ def _parse_personality(raw: Dict[str, Any]) -> Dict[str, float]:
     return result
 
 
-def _safe_pattern(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _safe_pattern(raw: dict[str, Any]) -> dict[str, Any]:
     """Safely convert LLM output to ResponsePattern kwargs."""
     return {
         "trigger": str(raw.get("trigger", "general situation"))[:200],
@@ -817,7 +814,7 @@ def _safe_pattern(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _safe_decision_factor(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _safe_decision_factor(raw: dict[str, Any]) -> dict[str, Any]:
     """Safely convert LLM output to DecisionFactor kwargs."""
     try:
         weight = round(max(0.0, min(1.0, float(raw.get("weight", 0.5)))), 3)

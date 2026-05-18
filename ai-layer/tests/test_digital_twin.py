@@ -16,8 +16,8 @@ All LLM calls are mocked — no network/router activity. Verifies:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -33,7 +33,6 @@ from md_chat_ai.agents import (
 )
 from md_chat_ai.agents.digital_twin import TwinRevokedError
 
-
 # ======================================================================
 # Fixtures
 # ======================================================================
@@ -41,7 +40,7 @@ from md_chat_ai.agents.digital_twin import TwinRevokedError
 
 def _make_mock_llm(
     chat_reply: str = "salut, multumesc pentru mesaj",
-    chat_json_reply: Dict[str, Any] | None = None,
+    chat_json_reply: dict[str, Any] | None = None,
 ) -> MagicMock:
     """Build a fully-mocked LLMClient stand-in."""
     client = MagicMock()
@@ -85,7 +84,7 @@ def self_profile() -> SelfProfile:
         custom_notes="Prefera lowercase si mesaje sub 50 caractere.",
         interests=["AI", "Telegram", "founder ops"],
         profession="CEO",
-        last_message_date=datetime.now(timezone.utc).isoformat(),
+        last_message_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -208,7 +207,7 @@ def test_revoke_propagates_to_attestation(self_profile: SelfProfile, mock_llm: M
             issuer="self",
             subject_did="did:web:md-chat.eu:oleg",
             signature="sig",
-            issued_at=datetime.now(timezone.utc).isoformat(),
+            issued_at=datetime.now(UTC).isoformat(),
         ),
     )
     t = DigitalTwin(profile=self_profile, agent_profile=agent, llm_client=mock_llm)
@@ -240,6 +239,7 @@ def test_audit_log_records_chat_and_revoke(twin: DigitalTwin) -> None:
 def test_export_audit_log_is_json(twin: DigitalTwin) -> None:
     """export_audit_log returns valid JSON."""
     import json
+
     twin.chat("test", mode="free_chat")
     raw = twin.export_audit_log()
     parsed = json.loads(raw)
@@ -253,18 +253,20 @@ def test_export_audit_log_is_json(twin: DigitalTwin) -> None:
 # ======================================================================
 
 
-def test_verified_attestation_marks_response_verified(
-    self_profile: SelfProfile, mock_llm: MagicMock
-) -> None:
+def test_verified_attestation_marks_response_verified(self_profile: SelfProfile, mock_llm: MagicMock) -> None:
     """A valid attestation propagates to TwinResponse.verified=True."""
     agent = AgentProfile(
-        agent_id=1, username="oleg", display_name="Oleg", bio="b", persona="p",
+        agent_id=1,
+        username="oleg",
+        display_name="Oleg",
+        bio="b",
+        persona="p",
         attestation=VerifiedAttestation(
             issuer="eIDAS-QTSP",
             subject_did="did:web:md-chat.eu:oleg",
             signature="abc123",
-            issued_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+            issued_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=365)).isoformat(),
         ),
     )
     t = DigitalTwin(profile=self_profile, agent_profile=agent, llm_client=mock_llm)
@@ -321,8 +323,10 @@ def test_profile_generator_llm_path_uses_own_messages(mock_llm: MagicMock) -> No
         "persona": "Direct, scurt, tehnic.",
         "personality": {"openness": 0.8, "conscientiousness": 0.7},
         "communication_style": {
-            "formality": "casual", "directness": "very_direct",
-            "emotionality": "stoic", "typical_length": "short",
+            "formality": "casual",
+            "directness": "very_direct",
+            "emotionality": "stoic",
+            "typical_length": "short",
         },
         "response_patterns": [
             {"trigger": "task", "pattern": "lowercase + scurt"},
@@ -378,7 +382,7 @@ def test_attestation_is_valid_when_signed_and_unexpired() -> None:
         issuer="self",
         subject_did="did:web:md-chat.eu:test",
         signature="signature_bytes",
-        expires_at=(datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(days=30)).isoformat(),
     )
     assert att.is_valid() is True
 
@@ -386,13 +390,18 @@ def test_attestation_is_valid_when_signed_and_unexpired() -> None:
 def test_attestation_invalid_when_expired_or_revoked() -> None:
     """Expired or revoked attestations are invalid."""
     expired = VerifiedAttestation(
-        issuer="self", subject_did="d", signature="s",
-        expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        issuer="self",
+        subject_did="d",
+        signature="s",
+        expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
     )
     assert expired.is_valid() is False
 
     revoked = VerifiedAttestation(
-        issuer="self", subject_did="d", signature="s", revoked=True,
+        issuer="self",
+        subject_did="d",
+        signature="s",
+        revoked=True,
     )
     assert revoked.is_valid() is False
 

@@ -18,8 +18,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TypeVar
+from typing import Any, TypeVar
 
 from ..config import CONFIG
 from .neo4j_backend import Neo4jGraphBackend
@@ -30,7 +31,7 @@ logger = logging.getLogger("md_chat_ai.graph.entity_reader")
 T = TypeVar("T")
 
 #: Canonical MD-Chat entity types (mirrors MDCHAT_ONTOLOGY in ontology.py).
-MDCHAT_ENTITY_TYPES: Set[str] = {
+MDCHAT_ENTITY_TYPES: set[str] = {
     "User",
     "Contact",
     "Channel",
@@ -47,7 +48,7 @@ MDCHAT_ENTITY_TYPES: Set[str] = {
 }
 
 #: System labels that do NOT represent an MD-Chat entity type.
-_SYSTEM_LABELS: Set[str] = {"Entity", "Node"}
+_SYSTEM_LABELS: set[str] = {"Entity", "Node"}
 
 
 # ---------------------------------------------------------------------------
@@ -73,14 +74,14 @@ class EntityNode:
 
     uuid: str
     name: str
-    labels: List[str]
+    labels: list[str]
     summary: str
-    attributes: Dict[str, Any]
+    attributes: dict[str, Any]
     consent_tier: str = "private"
-    related_edges: List[Dict[str, Any]] = field(default_factory=list)
-    related_nodes: List[Dict[str, Any]] = field(default_factory=list)
+    related_edges: list[dict[str, Any]] = field(default_factory=list)
+    related_nodes: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "uuid": self.uuid,
             "name": self.name,
@@ -92,7 +93,7 @@ class EntityNode:
             "related_nodes": self.related_nodes,
         }
 
-    def get_entity_type(self) -> Optional[str]:
+    def get_entity_type(self) -> str | None:
         """Return the first non-system label, i.e. the MD-Chat entity type."""
         for label in self.labels:
             if label not in _SYSTEM_LABELS:
@@ -112,12 +113,12 @@ class FilteredEntities:
         filtered_count: Number of nodes that passed the filter.
     """
 
-    entities: List[EntityNode]
-    entity_types: Set[str]
+    entities: list[EntityNode]
+    entity_types: set[str]
     total_count: int
     filtered_count: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "entities": [e.to_dict() for e in self.entities],
             "entity_types": sorted(self.entity_types),
@@ -145,7 +146,7 @@ class MdChatEntityReader:
 
     def __init__(
         self,
-        backend: Optional[Neo4jGraphBackend] = None,
+        backend: Neo4jGraphBackend | None = None,
     ) -> None:
         """
         Args:
@@ -184,7 +185,7 @@ class MdChatEntityReader:
         Raises:
             The last exception if all attempts fail.
         """
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         delay = initial_delay
         for attempt in range(max_retries):
             try:
@@ -199,9 +200,7 @@ class MdChatEntityReader:
                     time.sleep(delay)
                     delay *= 2
                 else:
-                    logger.error(
-                        f"{operation_name} failed after {max_retries} attempts: {exc}"
-                    )
+                    logger.error(f"{operation_name} failed after {max_retries} attempts: {exc}")
         assert last_exc is not None
         raise last_exc
 
@@ -209,16 +208,13 @@ class MdChatEntityReader:
     # Low-level accessors
     # ------------------------------------------------------------------
 
-    def _allowed_tiers(self, requested: Optional[List[str]]) -> List[str]:
+    def _allowed_tiers(self, requested: list[str] | None) -> list[str]:
         """Validate & normalise a list of consent tiers."""
         if not requested:
             return list(CONSENT_TIERS)
-        cleaned = [
-            normalise_consent_tier(t, default="private")
-            for t in requested
-        ]
+        cleaned = [normalise_consent_tier(t, default="private") for t in requested]
         # Deduplicate, keep order
-        seen: List[str] = []
+        seen: list[str] = []
         for t in cleaned:
             if t not in seen:
                 seen.append(t)
@@ -227,8 +223,8 @@ class MdChatEntityReader:
     def get_all_nodes(
         self,
         graph_id: str,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        consent_tiers: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Return all nodes from the graph as plain dicts.
 
@@ -242,28 +238,28 @@ class MdChatEntityReader:
         """
         logger.info(f"Fetching all nodes for graph {graph_id}...")
         tiers = self._allowed_tiers(consent_tiers)
-        raw_nodes = asyncio.run(
-            self.backend.get_nodes(graph_id, consent_tiers=tiers)
-        )
+        raw_nodes = asyncio.run(self.backend.get_nodes(graph_id, consent_tiers=tiers))
 
-        result: List[Dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
         for node in raw_nodes:
-            result.append({
-                "uuid": node.uuid,
-                "name": node.name,
-                "labels": node.labels,
-                "summary": node.summary,
-                "attributes": node.attributes,
-                "consent_tier": node.consent_tier,
-            })
+            result.append(
+                {
+                    "uuid": node.uuid,
+                    "name": node.name,
+                    "labels": node.labels,
+                    "summary": node.summary,
+                    "attributes": node.attributes,
+                    "consent_tier": node.consent_tier,
+                }
+            )
         logger.info(f"Retrieved {len(result)} nodes from graph {graph_id}")
         return result
 
     def get_all_edges(
         self,
         graph_id: str,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        consent_tiers: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Return all edges from the graph as plain dicts.
 
@@ -277,21 +273,21 @@ class MdChatEntityReader:
         """
         logger.info(f"Fetching all edges for graph {graph_id}...")
         tiers = self._allowed_tiers(consent_tiers)
-        raw_edges = asyncio.run(
-            self.backend.get_edges(graph_id, consent_tiers=tiers)
-        )
+        raw_edges = asyncio.run(self.backend.get_edges(graph_id, consent_tiers=tiers))
 
-        result: List[Dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
         for edge in raw_edges:
-            result.append({
-                "uuid": edge.uuid,
-                "name": edge.name,
-                "fact": edge.fact,
-                "source_node_uuid": edge.source_node_uuid,
-                "target_node_uuid": edge.target_node_uuid,
-                "attributes": edge.attributes,
-                "consent_tier": edge.consent_tier,
-            })
+            result.append(
+                {
+                    "uuid": edge.uuid,
+                    "name": edge.name,
+                    "fact": edge.fact,
+                    "source_node_uuid": edge.source_node_uuid,
+                    "target_node_uuid": edge.target_node_uuid,
+                    "attributes": edge.attributes,
+                    "consent_tier": edge.consent_tier,
+                }
+            )
         logger.info(f"Retrieved {len(result)} edges from graph {graph_id}")
         return result
 
@@ -302,9 +298,9 @@ class MdChatEntityReader:
     def filter_defined_entities(
         self,
         graph_id: str,
-        defined_entity_types: Optional[List[str]] = None,
+        defined_entity_types: list[str] | None = None,
         enrich_with_edges: bool = True,
-        consent_tiers: Optional[List[str]] = None,
+        consent_tiers: list[str] | None = None,
     ) -> FilteredEntities:
         """
         Filter graph nodes to those matching the MD-Chat ontology.
@@ -327,18 +323,14 @@ class MdChatEntityReader:
         all_nodes = self.get_all_nodes(graph_id, consent_tiers=tiers)
         total_count = len(all_nodes)
 
-        all_edges = (
-            self.get_all_edges(graph_id, consent_tiers=tiers)
-            if enrich_with_edges
-            else []
-        )
-        node_map: Dict[str, Dict[str, Any]] = {n["uuid"]: n for n in all_nodes}
+        all_edges = self.get_all_edges(graph_id, consent_tiers=tiers) if enrich_with_edges else []
+        node_map: dict[str, dict[str, Any]] = {n["uuid"]: n for n in all_nodes}
 
-        filtered: List[EntityNode] = []
-        types_found: Set[str] = set()
+        filtered: list[EntityNode] = []
+        types_found: set[str] = set()
 
         for node in all_nodes:
-            labels: List[str] = node.get("labels", [])
+            labels: list[str] = node.get("labels", [])
             custom_labels = [lb for lb in labels if lb not in _SYSTEM_LABELS]
 
             if not custom_labels:
@@ -364,28 +356,32 @@ class MdChatEntityReader:
             )
 
             if enrich_with_edges:
-                outgoing: List[Dict[str, Any]] = []
-                incoming: List[Dict[str, Any]] = []
-                neighbour_uuids: Set[str] = set()
+                outgoing: list[dict[str, Any]] = []
+                incoming: list[dict[str, Any]] = []
+                neighbour_uuids: set[str] = set()
 
                 for edge in all_edges:
                     if edge["source_node_uuid"] == node["uuid"]:
-                        outgoing.append({
-                            "direction": "outgoing",
-                            "edge_name": edge["name"],
-                            "fact": edge["fact"],
-                            "consent_tier": edge.get("consent_tier", "private"),
-                            "target_node_uuid": edge["target_node_uuid"],
-                        })
+                        outgoing.append(
+                            {
+                                "direction": "outgoing",
+                                "edge_name": edge["name"],
+                                "fact": edge["fact"],
+                                "consent_tier": edge.get("consent_tier", "private"),
+                                "target_node_uuid": edge["target_node_uuid"],
+                            }
+                        )
                         neighbour_uuids.add(edge["target_node_uuid"])
                     elif edge["target_node_uuid"] == node["uuid"]:
-                        incoming.append({
-                            "direction": "incoming",
-                            "edge_name": edge["name"],
-                            "fact": edge["fact"],
-                            "consent_tier": edge.get("consent_tier", "private"),
-                            "source_node_uuid": edge["source_node_uuid"],
-                        })
+                        incoming.append(
+                            {
+                                "direction": "incoming",
+                                "edge_name": edge["name"],
+                                "fact": edge["fact"],
+                                "consent_tier": edge.get("consent_tier", "private"),
+                                "source_node_uuid": edge["source_node_uuid"],
+                            }
+                        )
                         neighbour_uuids.add(edge["source_node_uuid"])
 
                 entity.related_edges = outgoing + incoming
@@ -403,10 +399,7 @@ class MdChatEntityReader:
 
             filtered.append(entity)
 
-        logger.info(
-            f"Filter complete: {total_count} total nodes, "
-            f"{len(filtered)} matched, types: {types_found}"
-        )
+        logger.info(f"Filter complete: {total_count} total nodes, " f"{len(filtered)} matched, types: {types_found}")
         return FilteredEntities(
             entities=filtered,
             entity_types=types_found,
@@ -419,8 +412,8 @@ class MdChatEntityReader:
         graph_id: str,
         entity_type: str,
         enrich_with_edges: bool = True,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> List[EntityNode]:
+        consent_tiers: list[str] | None = None,
+    ) -> list[EntityNode]:
         """
         Return all entities of a specific ontology type.
 
@@ -445,8 +438,8 @@ class MdChatEntityReader:
         self,
         graph_id: str,
         entity_uuid: str,
-        consent_tiers: Optional[List[str]] = None,
-    ) -> Optional[EntityNode]:
+        consent_tiers: list[str] | None = None,
+    ) -> EntityNode | None:
         """
         Fetch a single entity node and its full relationship context.
 
@@ -467,27 +460,31 @@ class MdChatEntityReader:
             return None
 
         edges = self.get_all_edges(graph_id, consent_tiers=tiers)
-        related_edges: List[Dict[str, Any]] = []
-        neighbour_uuids: Set[str] = set()
+        related_edges: list[dict[str, Any]] = []
+        neighbour_uuids: set[str] = set()
 
         for edge in edges:
             if edge["source_node_uuid"] == entity_uuid:
-                related_edges.append({
-                    "direction": "outgoing",
-                    "edge_name": edge["name"],
-                    "fact": edge["fact"],
-                    "consent_tier": edge.get("consent_tier", "private"),
-                    "target_node_uuid": edge["target_node_uuid"],
-                })
+                related_edges.append(
+                    {
+                        "direction": "outgoing",
+                        "edge_name": edge["name"],
+                        "fact": edge["fact"],
+                        "consent_tier": edge.get("consent_tier", "private"),
+                        "target_node_uuid": edge["target_node_uuid"],
+                    }
+                )
                 neighbour_uuids.add(edge["target_node_uuid"])
             elif edge["target_node_uuid"] == entity_uuid:
-                related_edges.append({
-                    "direction": "incoming",
-                    "edge_name": edge["name"],
-                    "fact": edge["fact"],
-                    "consent_tier": edge.get("consent_tier", "private"),
-                    "source_node_uuid": edge["source_node_uuid"],
-                })
+                related_edges.append(
+                    {
+                        "direction": "incoming",
+                        "edge_name": edge["name"],
+                        "fact": edge["fact"],
+                        "consent_tier": edge.get("consent_tier", "private"),
+                        "source_node_uuid": edge["source_node_uuid"],
+                    }
+                )
                 neighbour_uuids.add(edge["source_node_uuid"])
 
         related_nodes = [

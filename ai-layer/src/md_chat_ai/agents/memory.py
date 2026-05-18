@@ -25,11 +25,12 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..llm.client import LLMClient
 
@@ -47,12 +48,12 @@ class MemoryEntry:
 
     content: str
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    source: str = ""          # "user", "agent", "system"
-    contact_id: Optional[str] = None
+    source: str = ""  # "user", "agent", "system"
+    contact_id: str | None = None
     round_num: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "content": self.content,
             "timestamp": self.timestamp,
@@ -63,7 +64,7 @@ class MemoryEntry:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MemoryEntry":
+    def from_dict(cls, data: dict[str, Any]) -> MemoryEntry:
         return cls(
             content=data["content"],
             timestamp=data.get("timestamp", ""),
@@ -84,13 +85,13 @@ class ShortTermMemory:
 
     def __init__(self, max_entries: int = 20) -> None:
         self.max_entries = max_entries
-        self._entries: List[MemoryEntry] = []
-        self._eviction_callback: Optional[Callable[[MemoryEntry], None]] = None
+        self._entries: list[MemoryEntry] = []
+        self._eviction_callback: Callable[[MemoryEntry], None] | None = None
 
     # ---- Core API ---------------------------------------------------
 
     @property
-    def entries(self) -> List[MemoryEntry]:
+    def entries(self) -> list[MemoryEntry]:
         """All entries, oldest first."""
         return list(self._entries)
 
@@ -98,10 +99,10 @@ class ShortTermMemory:
         self,
         content: str,
         source: str = "user",
-        contact_id: Optional[str] = None,
+        contact_id: str | None = None,
         round_num: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[MemoryEntry]:
+        metadata: dict[str, Any] | None = None,
+    ) -> MemoryEntry | None:
         """
         Add a new memory entry.
 
@@ -116,7 +117,7 @@ class ShortTermMemory:
             metadata=metadata or {},
         )
 
-        evicted: Optional[MemoryEntry] = None
+        evicted: MemoryEntry | None = None
         if len(self._entries) >= self.max_entries:
             evicted = self._entries.pop(0)
             if self._eviction_callback:
@@ -128,9 +129,9 @@ class ShortTermMemory:
     def retrieve(
         self,
         n: int = 5,
-        source: Optional[str] = None,
-        contact_id: Optional[str] = None,
-    ) -> List[MemoryEntry]:
+        source: str | None = None,
+        contact_id: str | None = None,
+    ) -> list[MemoryEntry]:
         """
         Retrieve recent entries, optionally filtered.
 
@@ -149,7 +150,7 @@ class ShortTermMemory:
             filtered = [e for e in filtered if e.contact_id == contact_id]
         return filtered[-n:]
 
-    def search(self, keyword: str) -> List[MemoryEntry]:
+    def search(self, keyword: str) -> list[MemoryEntry]:
         """Simple keyword search across entry contents."""
         kw = keyword.lower()
         return [e for e in self._entries if kw in e.content.lower()]
@@ -158,7 +159,7 @@ class ShortTermMemory:
         """Return a plain-text summary of all current entries."""
         if not self._entries:
             return "(no entries)"
-        lines: List[str] = []
+        lines: list[str] = []
         for e in self._entries:
             prefix = f"[{e.source}]" if e.source else ""
             lines.append(f"{prefix} {e.content}")
@@ -172,10 +173,10 @@ class ShortTermMemory:
         """Register a callback for evicted entries."""
         self._eviction_callback = callback
 
-    def to_context_string(self, max_entries: Optional[int] = None) -> str:
+    def to_context_string(self, max_entries: int | None = None) -> str:
         """Format entries as a context block for LLM prompts."""
-        entries = self._entries[-(max_entries or self.max_entries):]
-        lines: List[str] = []
+        entries = self._entries[-(max_entries or self.max_entries) :]
+        lines: list[str] = []
         for e in entries:
             prefix = f"[{e.source}]" if e.source else ""
             lines.append(f"{prefix} {e.content}")
@@ -192,7 +193,7 @@ class ShortTermMemory:
 
     def load(self, path: str) -> None:
         """Load memory from a JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = json.load(f)
         self._entries = [MemoryEntry.from_dict(e) for e in raw]
 
@@ -229,7 +230,7 @@ Return JSON:
 
     def __init__(
         self,
-        llm_client: Optional[LLMClient] = None,
+        llm_client: LLMClient | None = None,
         compression_threshold: int = 10,
     ) -> None:
         """
@@ -239,8 +240,8 @@ Return JSON:
         """
         self._llm_client = llm_client  # may be None; lazily initialized on first use
         self.compression_threshold = compression_threshold
-        self._summaries: List[Dict[str, Any]] = []
-        self._raw_facts: List[str] = []
+        self._summaries: list[dict[str, Any]] = []
+        self._raw_facts: list[str] = []
         self._fact_count: int = 0
 
     @property
@@ -252,7 +253,7 @@ Return JSON:
 
     # ---- Core API ---------------------------------------------------
 
-    def add(self, fact: str, contact_id: Optional[str] = None) -> None:
+    def add(self, fact: str, contact_id: str | None = None) -> None:
         """
         Add a new fact. Triggers compression when threshold is reached.
 
@@ -266,10 +267,10 @@ Return JSON:
             self.compress()
 
     # Backward-compat alias
-    def add_fact(self, fact: str, contact_id: Optional[str] = None) -> None:
+    def add_fact(self, fact: str, contact_id: str | None = None) -> None:
         self.add(fact, contact_id=contact_id)
 
-    def retrieve(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
         """
         Search compressed summaries and raw facts for relevance.
 
@@ -281,7 +282,7 @@ Return JSON:
             List of matching summary dicts, most relevant first.
         """
         query_words = set(query.lower().split())
-        scored: List[Tuple[int, Dict[str, Any]]] = []
+        scored: list[tuple[int, dict[str, Any]]] = []
 
         for s in self._summaries:
             text = s["summary"].lower()
@@ -300,12 +301,12 @@ Return JSON:
         return [s for _, s in scored[:max_results]]
 
     # Backward-compat alias
-    def recall(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def recall(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
         return self.retrieve(query, max_results)
 
     def summarize(self) -> str:
         """Return a human-readable overview of all retained knowledge."""
-        parts: List[str] = []
+        parts: list[str] = []
         for i, s in enumerate(self._summaries, 1):
             parts.append(f"[Summary {i}] {s['summary']}")
         if self._raw_facts:
@@ -342,21 +343,23 @@ Return JSON:
                 "sentiment_shift": "unknown",
             }
 
-        self._summaries.append({
-            "summary": result.get("summary", summary_text),
-            "key_entities": result.get("key_entities", []),
-            "key_dates": result.get("key_dates", []),
-            "sentiment_shift": result.get("sentiment_shift", "stable"),
-            "facts_compressed": len(self._raw_facts),
-            "compressed_at": datetime.now().isoformat(),
-        })
+        self._summaries.append(
+            {
+                "summary": result.get("summary", summary_text),
+                "key_entities": result.get("key_entities", []),
+                "key_dates": result.get("key_dates", []),
+                "sentiment_shift": result.get("sentiment_shift", "stable"),
+                "facts_compressed": len(self._raw_facts),
+                "compressed_at": datetime.now().isoformat(),
+            }
+        )
         self._raw_facts.clear()
         return summary_text
 
-    def get_all_summaries(self) -> List[Dict[str, Any]]:
+    def get_all_summaries(self) -> list[dict[str, Any]]:
         return list(self._summaries)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {
             "total_facts_ingested": self._fact_count,
             "summaries_count": len(self._summaries),
@@ -375,7 +378,7 @@ Return JSON:
 
     def load(self, path: str) -> None:
         """Load memory from a JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             self._from_obj(json.load(f))
 
     def to_json(self) -> str:
@@ -384,14 +387,14 @@ Return JSON:
     def load_json(self, data: str) -> None:
         self._from_obj(json.loads(data))
 
-    def _to_obj(self) -> Dict[str, Any]:
+    def _to_obj(self) -> dict[str, Any]:
         return {
             "summaries": self._summaries,
             "raw_facts": self._raw_facts,
             "fact_count": self._fact_count,
         }
 
-    def _from_obj(self, obj: Dict[str, Any]) -> None:
+    def _from_obj(self, obj: dict[str, Any]) -> None:
         self._summaries = obj.get("summaries", [])
         self._raw_facts = obj.get("raw_facts", [])
         self._fact_count = obj.get("fact_count", 0)
@@ -408,19 +411,19 @@ class RelationshipState:
 
     contact_id: str
     contact_name: str
-    sentiment: float = 0.0          # -1.0 (hostile) to 1.0 (friendly)
-    trust_score: float = 0.5        # 0.0 to 1.0
+    sentiment: float = 0.0  # -1.0 (hostile) to 1.0 (friendly)
+    trust_score: float = 0.5  # 0.0 to 1.0
     interaction_count: int = 0
-    last_interaction: Optional[str] = None
-    topics_discussed: List[str] = field(default_factory=list)
-    commitments_made: List[str] = field(default_factory=list)
-    commitments_received: List[str] = field(default_factory=list)
-    conflict_history: List[str] = field(default_factory=list)
-    positive_moments: List[str] = field(default_factory=list)
+    last_interaction: str | None = None
+    topics_discussed: list[str] = field(default_factory=list)
+    commitments_made: list[str] = field(default_factory=list)
+    commitments_received: list[str] = field(default_factory=list)
+    conflict_history: list[str] = field(default_factory=list)
+    positive_moments: list[str] = field(default_factory=list)
     relationship_type: str = "neutral"  # ally / neutral / competitor / unknown
 
     # Trust score evolution log: list of {"round": N, "delta": d, "reason": "..."}
-    trust_history: List[Dict[str, Any]] = field(default_factory=list)
+    trust_history: list[dict[str, Any]] = field(default_factory=list)
 
     def apply_sentiment_delta(self, delta: float) -> None:
         """Clamp-safe sentiment update."""
@@ -430,17 +433,19 @@ class RelationshipState:
         """Clamp-safe trust update with history logging."""
         old = self.trust_score
         self.trust_score = round(max(0.0, min(1.0, self.trust_score + delta)), 4)
-        self.trust_history.append({
-            "round": round_num,
-            "from": old,
-            "to": self.trust_score,
-            "delta": delta,
-            "reason": reason,
-        })
+        self.trust_history.append(
+            {
+                "round": round_num,
+                "from": old,
+                "to": self.trust_score,
+                "delta": delta,
+                "reason": reason,
+            }
+        )
         # Keep only last 100 entries
         self.trust_history = self.trust_history[-100:]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "contact_id": self.contact_id,
             "contact_name": self.contact_name,
@@ -458,7 +463,7 @@ class RelationshipState:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "RelationshipState":
+    def from_dict(cls, d: dict[str, Any]) -> RelationshipState:
         return cls(
             contact_id=d["contact_id"],
             contact_name=d.get("contact_name", d["contact_id"]),
@@ -485,7 +490,7 @@ class RelationshipMemory:
     """
 
     def __init__(self) -> None:
-        self._relationships: Dict[str, RelationshipState] = {}
+        self._relationships: dict[str, RelationshipState] = {}
 
     # ---- Core API ---------------------------------------------------
 
@@ -504,11 +509,11 @@ class RelationshipMemory:
         contact_name: str = "",
         sentiment_delta: float = 0.0,
         trust_delta: float = 0.0,
-        topic: Optional[str] = None,
-        commitment_made: Optional[str] = None,
-        commitment_received: Optional[str] = None,
+        topic: str | None = None,
+        commitment_made: str | None = None,
+        commitment_received: str | None = None,
         was_positive: bool = True,
-        note: Optional[str] = None,
+        note: str | None = None,
         round_num: int = 0,
     ) -> RelationshipState:
         """Record an interaction and update the relationship state."""
@@ -541,7 +546,7 @@ class RelationshipMemory:
         state.relationship_type = _classify_relationship(state)
         return state
 
-    def retrieve(self, contact_id: str) -> Optional[RelationshipState]:
+    def retrieve(self, contact_id: str) -> RelationshipState | None:
         """Get relationship state for a specific contact."""
         return self._relationships.get(contact_id)
 
@@ -549,7 +554,7 @@ class RelationshipMemory:
         """Return a text summary of the full relationship network."""
         if not self._relationships:
             return "(no relationships tracked)"
-        lines: List[str] = []
+        lines: list[str] = []
         for _cid, s in self._relationships.items():
             lines.append(
                 f"{s.contact_name} ({s.relationship_type}): "
@@ -558,7 +563,7 @@ class RelationshipMemory:
             )
         return "\n".join(lines)
 
-    def get_health_report(self) -> Dict[str, Any]:
+    def get_health_report(self) -> dict[str, Any]:
         """Generate a relationship health report across all contacts."""
         if not self._relationships:
             return {"total_contacts": 0, "summary": "No relationships tracked"}
@@ -574,21 +579,23 @@ class RelationshipMemory:
             "avg_sentiment": round(sum(sentiments) / len(sentiments), 3),
             "avg_trust": round(sum(trusts) / len(trusts), 3),
             "best_relationships": [
-                {"name": s.contact_name, "sentiment": s.sentiment, "trust": s.trust_score}
-                for s in by_sentiment[:5]
+                {"name": s.contact_name, "sentiment": s.sentiment, "trust": s.trust_score} for s in by_sentiment[:5]
             ],
             "worst_relationships": [
-                {"name": s.contact_name, "sentiment": s.sentiment, "trust": s.trust_score}
-                for s in by_sentiment[-5:]
+                {"name": s.contact_name, "sentiment": s.sentiment, "trust": s.trust_score} for s in by_sentiment[-5:]
             ],
             "at_risk_contacts": [
-                {"name": s.contact_name, "sentiment": s.sentiment, "interactions": s.interaction_count}
+                {
+                    "name": s.contact_name,
+                    "sentiment": s.sentiment,
+                    "interactions": s.interaction_count,
+                }
                 for s in at_risk
             ],
             "relationship_types": _count_relationship_types(states),
         }
 
-    def get_all(self) -> Dict[str, RelationshipState]:
+    def get_all(self) -> dict[str, RelationshipState]:
         return dict(self._relationships)
 
     # ---- Persistence ------------------------------------------------
@@ -599,13 +606,15 @@ class RelationshipMemory:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(
                 {cid: s.to_dict() for cid, s in self._relationships.items()},
-                f, ensure_ascii=False, indent=2,
+                f,
+                ensure_ascii=False,
+                indent=2,
             )
         logger.debug("RelationshipMemory persisted to %s", path)
 
     def load(self, path: str) -> None:
         """Load relationship states from a JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             obj = json.load(f)
         self._relationships = {cid: RelationshipState.from_dict(s) for cid, s in obj.items()}
 
@@ -618,12 +627,10 @@ class RelationshipMemory:
         self._relationships = {cid: RelationshipState.from_dict(s) for cid, s in obj.items()}
 
     # Backward-compat alias
-    def record_interaction(
-        self, contact_id: str, contact_name: str = "", **kwargs: Any
-    ) -> RelationshipState:
+    def record_interaction(self, contact_id: str, contact_name: str = "", **kwargs: Any) -> RelationshipState:
         return self.add(contact_id, contact_name, **kwargs)
 
-    def get_contact_summary(self, contact_id: str) -> Optional[Dict[str, Any]]:
+    def get_contact_summary(self, contact_id: str) -> dict[str, Any] | None:
         state = self._relationships.get(contact_id)
         return state.to_dict() if state else None
 
@@ -646,18 +653,18 @@ class Promise:
 
     promise_id: str
     description: str
-    direction: str                       # "made" (we promised) or "received" (they promised)
+    direction: str  # "made" (we promised) or "received" (they promised)
     contact_id: str
     contact_name: str
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    due_date: Optional[str] = None
+    due_date: str | None = None
     status: PromiseStatus = PromiseStatus.PENDING
-    resolved_at: Optional[str] = None
+    resolved_at: str | None = None
     resolution_note: str = ""
     round_created: int = 0
-    round_resolved: Optional[int] = None
+    round_resolved: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "promise_id": self.promise_id,
             "description": self.description,
@@ -674,7 +681,7 @@ class Promise:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Promise":
+    def from_dict(cls, d: dict[str, Any]) -> Promise:
         return cls(
             promise_id=d["promise_id"],
             description=d["description"],
@@ -700,14 +707,14 @@ class PromiseMemory:
     Trust impact is reported so callers can decide how to update RelationshipMemory.
     """
 
-    TRUST_IMPACT: Dict[PromiseStatus, float] = {
+    TRUST_IMPACT: dict[PromiseStatus, float] = {
         PromiseStatus.FULFILLED: +0.05,
         PromiseStatus.BROKEN: -0.15,
         PromiseStatus.CANCELLED: -0.03,
     }
 
     def __init__(self) -> None:
-        self._promises: Dict[str, Promise] = {}  # promise_id → Promise
+        self._promises: dict[str, Promise] = {}  # promise_id → Promise
         self._counter: int = 0
 
     # ---- Core API ---------------------------------------------------
@@ -718,7 +725,7 @@ class PromiseMemory:
         direction: str,
         contact_id: str,
         contact_name: str = "",
-        due_date: Optional[str] = None,
+        due_date: str | None = None,
         round_num: int = 0,
     ) -> Promise:
         """Record a new promise."""
@@ -736,16 +743,18 @@ class PromiseMemory:
         self._promises[pid] = promise
         logger.debug(
             "Promise recorded: [%s] %s — %s",
-            direction, description[:60], contact_name,
+            direction,
+            description[:60],
+            contact_name,
         )
         return promise
 
     def retrieve(
         self,
-        contact_id: Optional[str] = None,
-        direction: Optional[str] = None,
-        status: Optional[PromiseStatus] = None,
-    ) -> List[Promise]:
+        contact_id: str | None = None,
+        direction: str | None = None,
+        status: PromiseStatus | None = None,
+    ) -> list[Promise]:
         """Retrieve promises with optional filters."""
         results = list(self._promises.values())
         if contact_id:
@@ -762,7 +771,7 @@ class PromiseMemory:
         new_status: PromiseStatus,
         note: str = "",
         round_num: int = 0,
-    ) -> Tuple[Promise, float]:
+    ) -> tuple[Promise, float]:
         """Resolve a promise and return the trust impact delta."""
         promise = self._promises.get(promise_id)
         if promise is None:
@@ -778,28 +787,28 @@ class PromiseMemory:
         trust_delta = self.TRUST_IMPACT.get(new_status, 0.0)
         logger.debug(
             "Promise resolved: %s → %s, trust_delta=%+.2f",
-            promise_id, new_status.value, trust_delta,
+            promise_id,
+            new_status.value,
+            trust_delta,
         )
         return promise, trust_delta
 
     def summarize(self) -> str:
         """Return a text summary of all promises grouped by status."""
-        by_status: Dict[str, List[str]] = defaultdict(list)
+        by_status: dict[str, list[str]] = defaultdict(list)
         for p in self._promises.values():
-            by_status[p.status.value].append(
-                f"  [{p.direction}] {p.description[:80]} ← {p.contact_name}"
-            )
-        lines: List[str] = []
+            by_status[p.status.value].append(f"  [{p.direction}] {p.description[:80]} ← {p.contact_name}")
+        lines: list[str] = []
         for status, items in by_status.items():
             lines.append(f"{status.upper()}:")
             lines.extend(items)
         return "\n".join(lines) if lines else "(no promises tracked)"
 
-    def get_pending_for_contact(self, contact_id: str) -> List[Promise]:
+    def get_pending_for_contact(self, contact_id: str) -> list[Promise]:
         """Get all pending promises involving a contact."""
         return self.retrieve(contact_id=contact_id, status=PromiseStatus.PENDING)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         promises = list(self._promises.values())
         return {
             "total": len(promises),
@@ -820,18 +829,17 @@ class PromiseMemory:
                     "promises": [p.to_dict() for p in self._promises.values()],
                     "counter": self._counter,
                 },
-                f, ensure_ascii=False, indent=2,
+                f,
+                ensure_ascii=False,
+                indent=2,
             )
 
     def load(self, path: str) -> None:
         """Load promises from a JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             obj = json.load(f)
         self._counter = obj.get("counter", 0)
-        self._promises = {
-            p["promise_id"]: Promise.from_dict(p)
-            for p in obj.get("promises", [])
-        }
+        self._promises = {p["promise_id"]: Promise.from_dict(p) for p in obj.get("promises", [])}
 
     def to_json(self) -> str:
         return json.dumps(
@@ -839,21 +847,20 @@ class PromiseMemory:
                 "promises": [p.to_dict() for p in self._promises.values()],
                 "counter": self._counter,
             },
-            ensure_ascii=False, indent=2,
+            ensure_ascii=False,
+            indent=2,
         )
 
     def load_json(self, data: str) -> None:
         obj = json.loads(data)
         self._counter = obj.get("counter", 0)
-        self._promises = {
-            p["promise_id"]: Promise.from_dict(p)
-            for p in obj.get("promises", [])
-        }
+        self._promises = {p["promise_id"]: Promise.from_dict(p) for p in obj.get("promises", [])}
 
 
 # ======================================================================
 # Emotional State
 # ======================================================================
+
 
 class Emotion(str, Enum):
     NEUTRAL = "neutral"
@@ -871,6 +878,7 @@ class Emotion(str, Enum):
 @dataclass
 class EmotionalEvent:
     """A recorded emotional shift during simulation."""
+
     round_num: int
     from_emotion: str
     to_emotion: str
@@ -878,7 +886,7 @@ class EmotionalEvent:
     intensity_delta: float
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "round_num": self.round_num,
             "from_emotion": self.from_emotion,
@@ -900,7 +908,7 @@ class EmotionalState:
     """
 
     # Map each emotion to a reversion-toward-neutral rate per round
-    REVERSION_RATE: Dict[str, float] = {
+    REVERSION_RATE: dict[str, float] = {
         Emotion.HAPPY.value: 0.05,
         Emotion.CURIOUS.value: 0.08,
         Emotion.FRUSTRATED.value: 0.06,
@@ -922,7 +930,7 @@ class EmotionalState:
         self.baseline_intensity = baseline_intensity
         self.current_emotion: str = baseline_emotion
         self.current_intensity: float = baseline_intensity
-        self._history: List[EmotionalEvent] = []
+        self._history: list[EmotionalEvent] = []
         self._round: int = 0
 
     # ---- Core API ---------------------------------------------------
@@ -932,7 +940,7 @@ class EmotionalState:
         new_emotion: str,
         intensity_delta: float,
         trigger: str = "",
-        round_num: Optional[int] = None,
+        round_num: int | None = None,
     ) -> None:
         """Apply an emotional shift."""
         rnd = round_num if round_num is not None else self._round
@@ -952,11 +960,11 @@ class EmotionalState:
         self._history.append(event)
         self._history = self._history[-200:]
 
-    def retrieve(self, last_n: int = 10) -> List[EmotionalEvent]:
+    def retrieve(self, last_n: int = 10) -> list[EmotionalEvent]:
         """Retrieve the most recent emotional events."""
         return self._history[-last_n:]
 
-    def tick(self, round_num: Optional[int] = None) -> None:
+    def tick(self, round_num: int | None = None) -> None:
         """Advance one simulation round."""
         if round_num is not None:
             self._round = round_num
@@ -966,19 +974,12 @@ class EmotionalState:
         # Revert intensity toward baseline
         rate = self.REVERSION_RATE.get(self.current_emotion, 0.05)
         if self.current_intensity > self.baseline_intensity:
-            self.current_intensity = round(
-                max(self.baseline_intensity, self.current_intensity - rate), 4
-            )
+            self.current_intensity = round(max(self.baseline_intensity, self.current_intensity - rate), 4)
         elif self.current_intensity < self.baseline_intensity:
-            self.current_intensity = round(
-                min(self.baseline_intensity, self.current_intensity + rate), 4
-            )
+            self.current_intensity = round(min(self.baseline_intensity, self.current_intensity + rate), 4)
 
         # Revert emotion toward baseline if intensity is low
-        if (
-            self.current_emotion != self.baseline_emotion
-            and self.current_intensity <= self.baseline_intensity + 0.05
-        ):
+        if self.current_emotion != self.baseline_emotion and self.current_intensity <= self.baseline_intensity + 0.05:
             self.current_emotion = self.baseline_emotion
 
     def summarize(self) -> str:
@@ -988,9 +989,9 @@ class EmotionalState:
             f"Baseline: {self.baseline_emotion} ({self.baseline_intensity:.2f})"
         )
 
-    def get_modifier(self) -> Dict[str, float]:
+    def get_modifier(self) -> dict[str, float]:
         """Return a dict of behavioral modifiers driven by the current emotion."""
-        modifiers: Dict[str, float] = {
+        modifiers: dict[str, float] = {
             "verbosity": 0.0,
             "aggressiveness": 0.0,
             "openness": 0.0,
@@ -998,11 +999,15 @@ class EmotionalState:
         }
         intensity = self.current_intensity
 
-        emotion_effects: Dict[str, Dict[str, float]] = {
+        emotion_effects: dict[str, dict[str, float]] = {
             Emotion.HAPPY.value: {"verbosity": 0.2, "openness": 0.3, "compliance": 0.2},
             Emotion.EXCITED.value: {"verbosity": 0.4, "openness": 0.2, "aggressiveness": 0.1},
             Emotion.ANGRY.value: {"aggressiveness": 0.5, "verbosity": 0.3, "compliance": -0.4},
-            Emotion.FRUSTRATED.value: {"aggressiveness": 0.2, "compliance": -0.2, "verbosity": -0.1},
+            Emotion.FRUSTRATED.value: {
+                "aggressiveness": 0.2,
+                "compliance": -0.2,
+                "verbosity": -0.1,
+            },
             Emotion.SAD.value: {"verbosity": -0.3, "openness": -0.2, "compliance": 0.1},
             Emotion.ANXIOUS.value: {"verbosity": 0.1, "compliance": 0.2, "openness": -0.1},
             Emotion.SUSPICIOUS.value: {"openness": -0.3, "compliance": -0.3, "aggressiveness": 0.1},
@@ -1024,7 +1029,7 @@ class EmotionalState:
             json.dump(self._to_obj(), f, ensure_ascii=False, indent=2)
 
     def load(self, path: str) -> None:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             self._from_obj(json.load(f))
 
     def to_json(self) -> str:
@@ -1033,7 +1038,7 @@ class EmotionalState:
     def load_json(self, data: str) -> None:
         self._from_obj(json.loads(data))
 
-    def _to_obj(self) -> Dict[str, Any]:
+    def _to_obj(self) -> dict[str, Any]:
         return {
             "baseline_emotion": self.baseline_emotion,
             "baseline_intensity": self.baseline_intensity,
@@ -1043,15 +1048,13 @@ class EmotionalState:
             "history": [e.to_dict() for e in self._history],
         }
 
-    def _from_obj(self, obj: Dict[str, Any]) -> None:
+    def _from_obj(self, obj: dict[str, Any]) -> None:
         self.baseline_emotion = obj.get("baseline_emotion", Emotion.NEUTRAL.value)
         self.baseline_intensity = obj.get("baseline_intensity", 0.5)
         self.current_emotion = obj.get("current_emotion", self.baseline_emotion)
         self.current_intensity = obj.get("current_intensity", self.baseline_intensity)
         self._round = obj.get("round", 0)
-        self._history = [
-            EmotionalEvent(**e) for e in obj.get("history", [])
-        ]
+        self._history = [EmotionalEvent(**e) for e in obj.get("history", [])]
 
 
 # ======================================================================
@@ -1073,7 +1076,7 @@ class TwinMemory:
     def __init__(
         self,
         contact_id: str,
-        llm_client: Optional[LLMClient] = None,
+        llm_client: LLMClient | None = None,
         stm_window: int = 20,
         ltm_compression_threshold: int = 10,
         baseline_emotion: str = Emotion.NEUTRAL.value,
@@ -1097,14 +1100,17 @@ class TwinMemory:
         self,
         content: str,
         source: str = "user",
-        contact_id: Optional[str] = None,
+        contact_id: str | None = None,
         round_num: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a message into short-term memory."""
         self.short_term.add(
-            content, source=source, contact_id=contact_id,
-            round_num=round_num, metadata=metadata,
+            content,
+            source=source,
+            contact_id=contact_id,
+            round_num=round_num,
+            metadata=metadata,
         )
 
     def update_relationship(
@@ -1113,8 +1119,8 @@ class TwinMemory:
         other_name: str = "",
         sentiment_delta: float = 0.0,
         trust_delta: float = 0.0,
-        topic: Optional[str] = None,
-        note: Optional[str] = None,
+        topic: str | None = None,
+        note: str | None = None,
         was_positive: bool = True,
         round_num: int = 0,
     ) -> RelationshipState:
@@ -1149,7 +1155,7 @@ class TwinMemory:
 
     def resolve_promise(
         self, promise_id: str, status: PromiseStatus, note: str = "", round_num: int = 0
-    ) -> Tuple[Promise, float]:
+    ) -> tuple[Promise, float]:
         """Resolve a promise and apply trust impact to the relationship."""
         promise, trust_delta = self.promises.resolve(promise_id, status, note, round_num)
         if trust_delta != 0:
@@ -1173,7 +1179,7 @@ class TwinMemory:
         """Update emotional state."""
         self.emotion.add(emotion, intensity_delta, trigger=trigger, round_num=round_num)
 
-    def tick(self, round_num: Optional[int] = None) -> None:
+    def tick(self, round_num: int | None = None) -> None:
         """Advance the emotional state one simulation round."""
         self.emotion.tick(round_num=round_num)
 
@@ -1202,10 +1208,10 @@ class TwinMemory:
         em_intensity = self.emotion.current_intensity
 
         pending_promises = self.promises.retrieve(status=PromiseStatus.PENDING)
-        promise_lines = "\n".join(
-            f"- [{p.direction}] {p.description[:60]} ← {p.contact_name}"
-            for p in pending_promises[:5]
-        ) or "(none)"
+        promise_lines = (
+            "\n".join(f"- [{p.direction}] {p.description[:60]} ← {p.contact_name}" for p in pending_promises[:5])
+            or "(none)"
+        )
 
         return (
             f"[Recent interactions]\n{recent}\n\n"
@@ -1265,8 +1271,8 @@ def _classify_relationship(state: RelationshipState) -> str:
     return "neutral"
 
 
-def _count_relationship_types(states: List[RelationshipState]) -> Dict[str, int]:
-    counts: Dict[str, int] = defaultdict(int)
+def _count_relationship_types(states: list[RelationshipState]) -> dict[str, int]:
+    counts: dict[str, int] = defaultdict(int)
     for s in states:
         counts[s.relationship_type] += 1
     return dict(counts)

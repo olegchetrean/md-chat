@@ -29,8 +29,8 @@ from .gdpr import (
 from .prompt_guard import PromptGuard, get_guard
 from .rate_limiter import (
     NamespaceLimit,
-    RateLimitResult,
     RateLimiter,
+    RateLimitResult,
     get_limiter,
     reset_limiter,
 )

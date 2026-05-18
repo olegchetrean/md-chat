@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import pytest
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -27,6 +26,7 @@ pytestmark = pytest.mark.integration
 def test_app_factory_returns_flask_app(app):
     """``create_app`` returns a Flask instance with the expected name."""
     from flask import Flask
+
     assert isinstance(app, Flask)
 
 
@@ -101,13 +101,11 @@ def test_expected_blueprint_present_or_skip(app, bp_name, prefixes):
 
     This keeps CI green while the sibling agents are still pushing code.
     """
-    if bp_name not in app.blueprints and not any(
-        _has_route_prefix(app, p) for p in prefixes
-    ):
+    if bp_name not in app.blueprints and not any(_has_route_prefix(app, p) for p in prefixes):
         pytest.skip(f"blueprint '{bp_name}' not yet registered — owning agent in flight")
-    assert any(_has_route_prefix(app, p) for p in prefixes), (
-        f"blueprint '{bp_name}' claims to be registered but exposes none of {prefixes}"
-    )
+    assert any(
+        _has_route_prefix(app, p) for p in prefixes
+    ), f"blueprint '{bp_name}' claims to be registered but exposes none of {prefixes}"
 
 
 def test_404_for_unknown_route(client):

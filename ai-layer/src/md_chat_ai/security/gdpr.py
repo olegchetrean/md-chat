@@ -36,9 +36,10 @@ import logging
 import os
 import sqlite3
 import uuid
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol
+from typing import Any, Protocol
 
 from ..config import CONFIG  # noqa: F401  -- imported for future config hooks
 
@@ -49,6 +50,7 @@ logger = logging.getLogger("md_chat_ai.security.gdpr")
 # Store protocol — injected by ai-layer subsystems
 # ---------------------------------------------------------------------------
 
+
 class DataStore(Protocol):
     """Minimal contract every store must satisfy for GDPR operations."""
 
@@ -56,7 +58,7 @@ class DataStore(Protocol):
     def erase(self, user_id: str) -> Any: ...
 
 
-_DEFAULT_STORE_REGISTRY: Dict[str, DataStore] = {}
+_DEFAULT_STORE_REGISTRY: dict[str, DataStore] = {}
 
 
 def register_store(name: str, store: DataStore) -> None:
@@ -83,14 +85,14 @@ DEFAULT_GRACE_PERIOD_DAYS = 90
 
 
 PROCESSING_PURPOSES = {
-    "analytics":         "Analytical processing of communication patterns",
-    "twin":              "Digital twin simulation based on user history",
-    "graph":             "Knowledge-graph construction over user data",
-    "report":            "Report or briefing generation",
-    "sync":              "Synchronisation between MD-Chat client and AI layer",
-    "memory":            "Long-term tacit memory storage for personalisation",
-    "data_export":       "GDPR Art. 15/20 data export",
-    "data_erasure":      "GDPR Art. 17 right-to-erasure execution",
+    "analytics": "Analytical processing of communication patterns",
+    "twin": "Digital twin simulation based on user history",
+    "graph": "Knowledge-graph construction over user data",
+    "report": "Report or briefing generation",
+    "sync": "Synchronisation between MD-Chat client and AI layer",
+    "memory": "Long-term tacit memory storage for personalisation",
+    "data_export": "GDPR Art. 15/20 data export",
+    "data_erasure": "GDPR Art. 17 right-to-erasure execution",
     "data_rectification": "GDPR Art. 16 rectification",
 }
 
@@ -98,6 +100,7 @@ PROCESSING_PURPOSES = {
 # ---------------------------------------------------------------------------
 # GDPRManager
 # ---------------------------------------------------------------------------
+
 
 class GDPRManager:
     """Central GDPR + RoPA manager for the MD-Chat AI layer.
@@ -109,12 +112,12 @@ class GDPRManager:
 
     def __init__(
         self,
-        db_path: Optional[str] = None,
-        stores: Optional[Mapping[str, DataStore]] = None,
+        db_path: str | None = None,
+        stores: Mapping[str, DataStore] | None = None,
     ) -> None:
         self.db_path = db_path or _GDPR_DB_PATH
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        self._stores: Dict[str, DataStore] = dict(stores) if stores else {}
+        self._stores: dict[str, DataStore] = dict(stores) if stores else {}
         # Late-bound default registry — consulted on each call so new stores
         # registered after the manager is created are still picked up.
         self._init_db()
@@ -125,8 +128,7 @@ class GDPRManager:
 
     def _init_db(self) -> None:
         with self._connect() as conn:
-            conn.executescript(
-                """
+            conn.executescript("""
                 CREATE TABLE IF NOT EXISTS consent (
                     id           TEXT PRIMARY KEY,
                     user_id      TEXT NOT NULL,
@@ -169,8 +171,7 @@ class GDPRManager:
                 );
                 CREATE INDEX IF NOT EXISTS idx_erasure_user ON erasure_log (user_id);
                 CREATE INDEX IF NOT EXISTS idx_erasure_status ON erasure_log (status);
-                """
-            )
+                """)
             conn.commit()
 
     def _connect(self) -> sqlite3.Connection:
@@ -181,15 +182,15 @@ class GDPRManager:
 
     @staticmethod
     def _now() -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     # ------------------------------------------------------------------
     # Store resolution
     # ------------------------------------------------------------------
 
-    def _resolve_stores(self) -> Dict[str, DataStore]:
+    def _resolve_stores(self) -> dict[str, DataStore]:
         """Merge per-instance stores with the global registry."""
-        merged: Dict[str, DataStore] = dict(_DEFAULT_STORE_REGISTRY)
+        merged: dict[str, DataStore] = dict(_DEFAULT_STORE_REGISTRY)
         merged.update(self._stores)
         return merged
 
@@ -197,9 +198,7 @@ class GDPRManager:
     # Art. 15 + 20 — Data export
     # ------------------------------------------------------------------
 
-    def export_user_data(
-        self, user_id: str, fmt: str = "json"
-    ) -> Dict[str, Any]:
+    def export_user_data(self, user_id: str, fmt: str = "json") -> dict[str, Any]:
         """Return a JSON-serialisable dict containing every piece of data the
         MD-Chat AI layer holds about ``user_id``.
 
@@ -215,7 +214,7 @@ class GDPRManager:
         """
         logger.info("GDPR Art.15/20 export requested user=%s", user_id)
 
-        export: Dict[str, Any] = {
+        export: dict[str, Any] = {
             "export_meta": {
                 "user_id": user_id,
                 "exported_at": self._now(),
@@ -234,7 +233,9 @@ class GDPRManager:
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "GDPR export: store=%s failed for user=%s: %s",
-                    name, user_id, exc,
+                    name,
+                    user_id,
+                    exc,
                 )
                 export["stores"][name] = {"_error": str(exc)}
 
@@ -256,8 +257,8 @@ class GDPRManager:
         return export
 
     @staticmethod
-    def _build_csv_sections(export: Dict[str, Any]) -> Dict[str, str]:
-        sections: Dict[str, str] = {}
+    def _build_csv_sections(export: dict[str, Any]) -> dict[str, str]:
+        sections: dict[str, str] = {}
         for key in ("consent", "processing_records", "erasure_requests"):
             rows = export.get(key, [])
             if not rows or not isinstance(rows, list):
@@ -282,7 +283,7 @@ class GDPRManager:
         grace_period_days: int = DEFAULT_GRACE_PERIOD_DAYS,
         requested_by: str = "user",
         execute_immediately: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Schedule (or perform) GDPR Art. 17 erasure for ``user_id``.
 
         Wipes everything we hold for the user across the registered stores
@@ -308,10 +309,13 @@ class GDPRManager:
         """
         logger.warning(
             "GDPR Art.17 erasure user=%s grace=%dd by=%s immediate=%s",
-            user_id, grace_period_days, requested_by, execute_immediately,
+            user_id,
+            grace_period_days,
+            requested_by,
+            execute_immediately,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scheduled_at = now + timedelta(days=max(0, grace_period_days))
 
         request_id = uuid.uuid4().hex
@@ -359,7 +363,7 @@ class GDPRManager:
         # Immediate erasure path -------------------------------------------------
         return self._execute_erasure(request_id, user_id)
 
-    def execute_due_erasures(self) -> List[Dict[str, Any]]:
+    def execute_due_erasures(self) -> list[dict[str, Any]]:
         """Run every erasure whose scheduled_at is in the past. Background worker."""
         now_iso = self._now()
         with self._connect() as conn:
@@ -369,26 +373,30 @@ class GDPRManager:
                 (now_iso,),
             ).fetchall()
 
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for row in rows:
             try:
                 results.append(self._execute_erasure(row["id"], row["user_id"]))
             except Exception as exc:  # noqa: BLE001
                 logger.error(
                     "GDPR erasure: failed request=%s user=%s: %s",
-                    row["id"], row["user_id"], exc,
+                    row["id"],
+                    row["user_id"],
+                    exc,
                 )
         return results
 
-    def _execute_erasure(self, request_id: str, user_id: str) -> Dict[str, Any]:
-        rows_deleted: Dict[str, Any] = {}
+    def _execute_erasure(self, request_id: str, user_id: str) -> dict[str, Any]:
+        rows_deleted: dict[str, Any] = {}
         for name, store in self._resolve_stores().items():
             try:
                 rows_deleted[name] = store.erase(user_id)
             except Exception as exc:  # noqa: BLE001
                 logger.error(
                     "GDPR erasure: store=%s failed user=%s: %s",
-                    name, user_id, exc,
+                    name,
+                    user_id,
+                    exc,
                 )
                 rows_deleted[name] = {"_error": str(exc)}
 
@@ -416,7 +424,8 @@ class GDPRManager:
 
         logger.warning(
             "GDPR Art.17 erasure EXECUTED user=%s rows=%s",
-            user_id, rows_deleted,
+            user_id,
+            rows_deleted,
         )
         return {
             "request_id": request_id,
@@ -439,9 +448,7 @@ class GDPRManager:
 
     def _erase_consent_rows(self, user_id: str) -> int:
         with self._connect() as conn:
-            count = conn.execute(
-                "SELECT COUNT(*) FROM consent WHERE user_id = ?", (user_id,)
-            ).fetchone()[0]
+            count = conn.execute("SELECT COUNT(*) FROM consent WHERE user_id = ?", (user_id,)).fetchone()[0]
             conn.execute("DELETE FROM consent WHERE user_id = ?", (user_id,))
             conn.commit()
         return int(count)
@@ -450,15 +457,11 @@ class GDPRManager:
     # Art. 16 — Data rectification (best-effort delegate)
     # ------------------------------------------------------------------
 
-    def rectify_user_data(
-        self, user_id: str, updates: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def rectify_user_data(self, user_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         """Forward a rectification request to every store that supports it."""
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
         for name, store in self._resolve_stores().items():
-            rectify: Optional[Callable[[str, Dict[str, Any]], Any]] = getattr(
-                store, "rectify", None
-            )
+            rectify: Callable[[str, dict[str, Any]], Any] | None = getattr(store, "rectify", None)
             if rectify is None:
                 continue
             try:
@@ -490,9 +493,9 @@ class GDPRManager:
         consent_type: str,
         granted: bool,
         method: str = "explicit",
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict[str, Any]:
         now = self._now()
         record_id = uuid.uuid4().hex
         with self._connect() as conn:
@@ -507,8 +510,13 @@ class GDPRManager:
                     ip_address, user_agent, granted_at, revoked_at, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    record_id, user_id, consent_type, 1 if granted else 0, method,
-                    ip_address, user_agent,
+                    record_id,
+                    user_id,
+                    consent_type,
+                    1 if granted else 0,
+                    method,
+                    ip_address,
+                    user_agent,
                     now if granted else None,
                     None if granted else now,
                     now,
@@ -517,7 +525,10 @@ class GDPRManager:
             conn.commit()
         logger.info(
             "GDPR consent: user=%s type=%s granted=%s method=%s",
-            user_id, consent_type, granted, method,
+            user_id,
+            consent_type,
+            granted,
+            method,
         )
         return {
             "id": record_id,
@@ -528,9 +539,9 @@ class GDPRManager:
             "timestamp": now,
         }
 
-    def get_consent_status(self, user_id: str) -> Dict[str, Any]:
+    def get_consent_status(self, user_id: str) -> dict[str, Any]:
         rows = self._get_consent_rows(user_id)
-        consent_types: Dict[str, Any] = {}
+        consent_types: dict[str, Any] = {}
         for row in rows:
             ct = row["consent_type"]
             if ct in consent_types:
@@ -548,7 +559,7 @@ class GDPRManager:
             "last_updated": max((r["created_at"] for r in rows), default=None),
         }
 
-    def _get_consent_rows(self, user_id: str) -> List[Dict[str, Any]]:
+    def _get_consent_rows(self, user_id: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM consent WHERE user_id = ? ORDER BY created_at DESC",
@@ -556,7 +567,7 @@ class GDPRManager:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def _get_processing_rows_for_user(self, user_id: str) -> List[Dict[str, Any]]:
+    def _get_processing_rows_for_user(self, user_id: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM processing_log WHERE user_id = ? ORDER BY created_at DESC",
@@ -564,7 +575,7 @@ class GDPRManager:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def _get_erasure_rows_for_user(self, user_id: str) -> List[Dict[str, Any]]:
+    def _get_erasure_rows_for_user(self, user_id: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM erasure_log WHERE user_id = ? ORDER BY requested_at DESC",
@@ -581,7 +592,7 @@ class GDPRManager:
         purpose: str,
         legal_basis: str,
         data_categories: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         processor: str = "md-chat-ai",
         retention_days: int = 365,
         notes: str = "",
@@ -594,8 +605,15 @@ class GDPRManager:
                     processor, retention_days, notes, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    record_id, user_id, purpose, legal_basis, data_categories,
-                    processor, retention_days, notes, self._now(),
+                    record_id,
+                    user_id,
+                    purpose,
+                    legal_basis,
+                    data_categories,
+                    processor,
+                    retention_days,
+                    notes,
+                    self._now(),
                 ),
             )
             conn.commit()
@@ -605,8 +623,8 @@ class GDPRManager:
         self,
         limit: int = 500,
         offset: int = 0,
-        purpose_filter: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        purpose_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
         with self._connect() as conn:
             if purpose_filter:
                 rows = conn.execute(
@@ -627,7 +645,7 @@ class GDPRManager:
 # Module-level singleton
 # ---------------------------------------------------------------------------
 
-_manager: Optional[GDPRManager] = None
+_manager: GDPRManager | None = None
 
 
 def get_manager() -> GDPRManager:

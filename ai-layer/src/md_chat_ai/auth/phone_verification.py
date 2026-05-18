@@ -25,7 +25,6 @@ import re
 import secrets
 import time
 from dataclasses import dataclass, field
-from typing import Optional
 
 import httpx
 
@@ -155,7 +154,7 @@ def _constant_time_eq(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode("ascii"), b.encode("ascii"))
 
 
-def _pick_sms_body(code: str, accept_language: Optional[str]) -> str:
+def _pick_sms_body(code: str, accept_language: str | None) -> str:
     if accept_language:
         for tag in accept_language.split(","):
             primary = tag.split(";")[0].strip().lower()[:2]
@@ -172,14 +171,14 @@ def _pick_sms_body(code: str, accept_language: Optional[str]) -> str:
 @dataclass
 class SendCodeResult:
     ok: bool
-    error: Optional[str] = None
-    cooldown_until: Optional[float] = None  # unix timestamp
+    error: str | None = None
+    cooldown_until: float | None = None  # unix timestamp
 
 
 @dataclass
 class VerifyCodeResult:
     ok: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +195,7 @@ class _CodeRecord:
     created_at: float
     expires_at: float
     attempts: int = 0
-    consumed_at: Optional[float] = None
+    consumed_at: float | None = None
 
 
 @dataclass
@@ -208,16 +207,12 @@ class InMemoryStore:
     def insert(self, record: _CodeRecord) -> None:
         self.records.append(record)
 
-    def latest_for_user(self, user_id: str) -> Optional[_CodeRecord]:
+    def latest_for_user(self, user_id: str) -> _CodeRecord | None:
         candidates = [r for r in self.records if r.user_id == user_id]
         return max(candidates, key=lambda r: r.created_at) if candidates else None
 
-    def latest_active(self, user_id: str, now: float) -> Optional[_CodeRecord]:
-        candidates = [
-            r
-            for r in self.records
-            if r.user_id == user_id and r.consumed_at is None and r.expires_at > now
-        ]
+    def latest_active(self, user_id: str, now: float) -> _CodeRecord | None:
+        candidates = [r for r in self.records if r.user_id == user_id and r.consumed_at is None and r.expires_at > now]
         return max(candidates, key=lambda r: r.created_at) if candidates else None
 
     def count_within(self, user_id: str, since: float) -> int:
@@ -243,9 +238,9 @@ def get_store() -> InMemoryStore:
 async def _send_sms_via_infobip(
     phone_e164: str,
     code: str,
-    accept_language: Optional[str],
-    client: Optional[httpx.AsyncClient] = None,
-) -> tuple[bool, Optional[str]]:
+    accept_language: str | None,
+    client: httpx.AsyncClient | None = None,
+) -> tuple[bool, str | None]:
     api_key = _infobip_api_key()
     if not api_key:
         return False, "sms_provider_not_configured"
@@ -291,10 +286,10 @@ async def send_phone_verification_code(
     phone_number: str,
     country_code: str,
     *,
-    accept_language: Optional[str] = None,
-    store: Optional[InMemoryStore] = None,
-    http_client: Optional[httpx.AsyncClient] = None,
-    now: Optional[float] = None,
+    accept_language: str | None = None,
+    store: InMemoryStore | None = None,
+    http_client: httpx.AsyncClient | None = None,
+    now: float | None = None,
 ) -> SendCodeResult:
     """Generate a 6-digit code, persist hash, send via SMS, enforce rate limits."""
     backend = store or _default_store
@@ -337,8 +332,8 @@ async def verify_phone_code(
     user_id: str,
     code: str,
     *,
-    store: Optional[InMemoryStore] = None,
-    now: Optional[float] = None,
+    store: InMemoryStore | None = None,
+    now: float | None = None,
 ) -> VerifyCodeResult:
     """Verify a phone code. Increments ``attempts`` before comparing.
 
@@ -376,8 +371,8 @@ def send_phone_verification_code_sync(
     phone_number: str,
     country_code: str,
     *,
-    accept_language: Optional[str] = None,
-    store: Optional[InMemoryStore] = None,
+    accept_language: str | None = None,
+    store: InMemoryStore | None = None,
 ) -> SendCodeResult:
     return asyncio.run(
         send_phone_verification_code(
@@ -394,6 +389,6 @@ def verify_phone_code_sync(
     user_id: str,
     code: str,
     *,
-    store: Optional[InMemoryStore] = None,
+    store: InMemoryStore | None = None,
 ) -> VerifyCodeResult:
     return asyncio.run(verify_phone_code(user_id, code, store=store))

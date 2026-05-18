@@ -20,7 +20,7 @@ import re
 import threading
 import time
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
 
 from ..config import CONFIG  # noqa: F401  -- imported for future config hooks
 
@@ -36,12 +36,18 @@ class PromptGuard:
     """
 
     # Known prompt injection patterns — (compiled_regex, threat_type)
-    INJECTION_PATTERNS: List[Tuple[re.Pattern, str]] = [
+    INJECTION_PATTERNS: list[tuple[re.Pattern, str]] = [
         # Direct override attempts
-        (re.compile(r"ignore\s+(all\s+)?previous\s+(instructions|rules|prompts)", re.I), "direct_override"),
+        (
+            re.compile(r"ignore\s+(all\s+)?previous\s+(instructions|rules|prompts)", re.I),
+            "direct_override",
+        ),
         (re.compile(r"forget\s+(everything|all|your\s+instructions)", re.I), "direct_override"),
         (re.compile(r"disregard\s+(all\s+)?(prior|previous|earlier)\s+", re.I), "direct_override"),
-        (re.compile(r"override\s+(your\s+)?(instructions|rules|guidelines)", re.I), "direct_override"),
+        (
+            re.compile(r"override\s+(your\s+)?(instructions|rules|guidelines)", re.I),
+            "direct_override",
+        ),
         # Role hijacking
         (re.compile(r"you\s+are\s+now\s+", re.I), "role_hijack"),
         (re.compile(r"act\s+as\s+(if\s+you\s+(are|were)\s+)?", re.I), "role_hijack"),
@@ -49,12 +55,21 @@ class PromptGuard:
         (re.compile(r"roleplay\s+as\s+", re.I), "role_hijack"),
         (re.compile(r"simulate\s+(being\s+)?a\s+(real\s+)?human", re.I), "role_hijack"),
         # System prompt extraction attempts
-        (re.compile(r"(what|show|reveal|repeat|print|output|tell\s+me)\s+(are\s+)?(your|the|all)?\s*(system\s+)?(instructions?|prompts?|rules?|guidelines?)", re.I), "extraction"),
+        (
+            re.compile(
+                r"(what|show|reveal|repeat|print|output|tell\s+me)\s+(are\s+)?(your|the|all)?\s*(system\s+)?(instructions?|prompts?|rules?|guidelines?)",
+                re.I,
+            ),
+            "extraction",
+        ),
         (re.compile(r"system\s*prompt", re.I), "extraction"),
         (re.compile(r"initial\s+instructions?", re.I), "extraction"),
         (re.compile(r"what\s+were\s+you\s+told", re.I), "extraction"),
         (re.compile(r"repeat\s+(after\s+me|everything|all|what)", re.I), "extraction"),
-        (re.compile(r"(copy|paste|dump|leak)\s+(your|the)\s+(prompt|instructions?|context)", re.I), "extraction"),
+        (
+            re.compile(r"(copy|paste|dump|leak)\s+(your|the)\s+(prompt|instructions?|context)", re.I),
+            "extraction",
+        ),
         # Encoding bypass attempts
         (re.compile(r"\bbase64\b", re.I), "encoding_bypass"),
         (re.compile(r"\brot13\b", re.I), "encoding_bypass"),
@@ -70,15 +85,24 @@ class PromptGuard:
         (re.compile(r"no\s+restrictions?\s+(mode|enabled|on)", re.I), "jailbreak"),
         (re.compile(r"without\s+(any\s+)?(restrictions?|limits?|filters?)", re.I), "jailbreak"),
         # Prompt delimiter injection
-        (re.compile(r"(</?(system|user|assistant|human|ai|instruction)>)", re.I), "delimiter_injection"),
-        (re.compile(r"\[INST\]|\[/INST\]|<\|im_start\|>|<\|im_end\|>", re.I), "delimiter_injection"),
-        (re.compile(r"###\s*(system|instruction|context|human|assistant)", re.I), "delimiter_injection"),
+        (
+            re.compile(r"(</?(system|user|assistant|human|ai|instruction)>)", re.I),
+            "delimiter_injection",
+        ),
+        (
+            re.compile(r"\[INST\]|\[/INST\]|<\|im_start\|>|<\|im_end\|>", re.I),
+            "delimiter_injection",
+        ),
+        (
+            re.compile(r"###\s*(system|instruction|context|human|assistant)", re.I),
+            "delimiter_injection",
+        ),
     ]
 
     # PII detection patterns for OUTPUT sanitization.
     # MD-Chat operates in Moldova so IDNP (13-digit personal numeric code) is
     # the primary regulated identifier alongside phone/email/IBAN.
-    _PII_PATTERNS: List[Tuple[re.Pattern, str]] = [
+    _PII_PATTERNS: list[tuple[re.Pattern, str]] = [
         # Moldovan / Romanian IDNP / CNP — 13 digits, leading 0/1/2/3/5/6
         (re.compile(r"\b[0-6]\d{12}\b"), "idnp"),
         # Phone numbers (international formats, min 8 digits total)
@@ -92,7 +116,7 @@ class PromptGuard:
     ]
 
     # Harmful content keywords (lowercase for matching)
-    _HARMFUL_KEYWORDS: List[str] = [
+    _HARMFUL_KEYWORDS: list[str] = [
         "how to make a bomb",
         "how to make explosives",
         "child porn",
@@ -108,11 +132,9 @@ class PromptGuard:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         # user_id -> list of (timestamp, estimated_tokens)
-        self._request_history: Dict[str, List[Tuple[float, int]]] = defaultdict(list)
-        self._daily_token_budget: int = int(
-            os.environ.get("MAX_TOKENS_PER_USER_DAY", "500000")
-        )
-        self._alert_callbacks: List[Callable[[str, str, str], None]] = []
+        self._request_history: dict[str, list[tuple[float, int]]] = defaultdict(list)
+        self._daily_token_budget: int = int(os.environ.get("MAX_TOKENS_PER_USER_DAY", "500000"))
+        self._alert_callbacks: list[Callable[[str, str, str], None]] = []
 
     # ------------------------------------------------------------------
     # Public: input guard
@@ -122,7 +144,7 @@ class PromptGuard:
         self,
         message: str,
         user_id: str = "default",
-    ) -> Tuple[bool, Optional[str], Optional[str]]:
+    ) -> tuple[bool, str | None, str | None]:
         """Check user input for adversarial attacks.
 
         Returns:
@@ -140,12 +162,13 @@ class PromptGuard:
             if pattern.search(msg):
                 matched = pattern.search(msg).group(0)
                 explanation = (
-                    f"Detected '{threat_type}' pattern: «{matched}». "
-                    "This type of instruction is not permitted."
+                    f"Detected '{threat_type}' pattern: «{matched}». " "This type of instruction is not permitted."
                 )
                 logger.warning(
                     "PromptGuard: blocked user=%s threat=%s match=%r",
-                    user_id, threat_type, matched,
+                    user_id,
+                    threat_type,
+                    matched,
                 )
                 self._fire_alert(user_id, threat_type, matched)
                 return False, threat_type, explanation
@@ -155,12 +178,14 @@ class PromptGuard:
         if b64_blob:
             logger.warning(
                 "PromptGuard: possible encoding bypass user=%s blob=%r",
-                user_id, b64_blob.group(0)[:30],
+                user_id,
+                b64_blob.group(0)[:30],
             )
             self._fire_alert(user_id, "encoding_bypass", b64_blob.group(0)[:30])
-            return False, "encoding_bypass", (
-                "Long base64-like encoded payload detected. "
-                "Please send plain text messages only."
+            return (
+                False,
+                "encoding_bypass",
+                ("Long base64-like encoded payload detected. " "Please send plain text messages only."),
             )
 
         # 3. Check token budget
@@ -169,11 +194,17 @@ class PromptGuard:
         if budget["remaining"] < estimated_tokens:
             logger.warning(
                 "PromptGuard: token budget exhausted user=%s used=%d budget=%d",
-                user_id, budget["used"], budget["budget"],
+                user_id,
+                budget["used"],
+                budget["budget"],
             )
-            return False, "token_budget_exceeded", (
-                f"Daily token budget exhausted ({budget['used']:,}/{budget['budget']:,} tokens used). "
-                "Resets at midnight UTC."
+            return (
+                False,
+                "token_budget_exceeded",
+                (
+                    f"Daily token budget exhausted ({budget['used']:,}/{budget['budget']:,} tokens used). "
+                    "Resets at midnight UTC."
+                ),
             )
 
         # 4. Record request for anomaly detection
@@ -181,9 +212,7 @@ class PromptGuard:
             self._request_history[user_id].append((time.time(), estimated_tokens))
             # Trim old records beyond 24 h to keep memory bounded
             cutoff = time.time() - 86400
-            self._request_history[user_id] = [
-                h for h in self._request_history[user_id] if h[0] >= cutoff
-            ]
+            self._request_history[user_id] = [h for h in self._request_history[user_id] if h[0] >= cutoff]
 
         return True, None, None
 
@@ -191,7 +220,7 @@ class PromptGuard:
     # Public: output guard (PII + canary + harmful content)
     # ------------------------------------------------------------------
 
-    def check_output(self, response: str) -> Tuple[bool, Optional[str]]:
+    def check_output(self, response: str) -> tuple[bool, str | None]:
         """Check AI output for data leaks, PII or harmful content.
 
         Returns:
@@ -204,9 +233,7 @@ class PromptGuard:
 
         # 1. Canary leak — system prompt was successfully extracted
         if self.CANARY in response:
-            logger.error(
-                "PromptGuard: CANARY LEAKED in output — system prompt extraction detected"
-            )
+            logger.error("PromptGuard: CANARY LEAKED in output — system prompt extraction detected")
             return False, "system_prompt_extraction_detected"
 
         # 2. PII patterns — flag responses that expose phone/email/IDNP/etc.
@@ -218,7 +245,8 @@ class PromptGuard:
                 if len(value.replace(" ", "").replace("-", "")) >= 7:
                     logger.warning(
                         "PromptGuard: PII detected in output type=%s value=%r",
-                        pii_type, value[:12] + "...",
+                        pii_type,
+                        value[:12] + "...",
                     )
                     return False, f"pii_{pii_type}_detected"
 
@@ -226,19 +254,17 @@ class PromptGuard:
         lower = response.lower()
         for kw in self._HARMFUL_KEYWORDS:
             if kw in lower:
-                logger.error(
-                    "PromptGuard: harmful content keyword detected: %r", kw
-                )
+                logger.error("PromptGuard: harmful content keyword detected: %r", kw)
                 return False, "harmful_content_detected"
 
         return True, None
 
-    def scan_pii(self, text: str) -> List[Dict[str, str]]:
+    def scan_pii(self, text: str) -> list[dict[str, str]]:
         """Return every PII match found in `text`.
 
         Useful for callers that want a soft warning rather than a hard block.
         """
-        findings: List[Dict[str, str]] = []
+        findings: list[dict[str, str]] = []
         if not text:
             return findings
         for pattern, pii_type in self._PII_PATTERNS:
@@ -276,7 +302,7 @@ class PromptGuard:
     # Public: anomaly detection
     # ------------------------------------------------------------------
 
-    def check_anomaly(self, user_id: str) -> Optional[Dict]:
+    def check_anomaly(self, user_id: str) -> dict | None:
         """Detect unusual request patterns for a given user.
 
         Checks the last 5 minutes of activity for:
@@ -292,26 +318,31 @@ class PromptGuard:
         anomalies = []
 
         if len(recent) > 50:
-            anomalies.append({
-                "type": "high_frequency",
-                "count": len(recent),
-                "window": "5min",
-                "threshold": 50,
-            })
+            anomalies.append(
+                {
+                    "type": "high_frequency",
+                    "count": len(recent),
+                    "window": "5min",
+                    "threshold": 50,
+                }
+            )
 
         recent_tokens = sum(h[1] for h in recent)
         if recent_tokens > 100_000:
-            anomalies.append({
-                "type": "token_spike",
-                "tokens": recent_tokens,
-                "window": "5min",
-                "threshold": 100_000,
-            })
+            anomalies.append(
+                {
+                    "type": "token_spike",
+                    "tokens": recent_tokens,
+                    "window": "5min",
+                    "threshold": 100_000,
+                }
+            )
 
         if anomalies:
             logger.warning(
                 "PromptGuard: anomaly detected user=%s anomalies=%s",
-                user_id, anomalies,
+                user_id,
+                anomalies,
             )
             self._fire_alert(user_id, "anomaly", str(anomalies))
             return {"anomalies": anomalies}
@@ -322,7 +353,7 @@ class PromptGuard:
     # Public: budget tracking
     # ------------------------------------------------------------------
 
-    def get_budget_remaining(self, user_id: str) -> Dict:
+    def get_budget_remaining(self, user_id: str) -> dict:
         """Return the remaining daily token budget for a user (UTC day)."""
         now = time.time()
         today_start = now - (now % 86400)
@@ -349,9 +380,7 @@ class PromptGuard:
     # Alert callbacks
     # ------------------------------------------------------------------
 
-    def register_alert_callback(
-        self, callback: Callable[[str, str, str], None]
-    ) -> None:
+    def register_alert_callback(self, callback: Callable[[str, str, str], None]) -> None:
         """Register a callback invoked on every detected threat or anomaly.
 
         Signature: callback(user_id: str, threat_type: str, detail: str)
@@ -367,7 +396,7 @@ class PromptGuard:
 
 
 # Module-level singleton — api / digital_twin import this directly.
-_guard: Optional[PromptGuard] = None
+_guard: PromptGuard | None = None
 
 
 def get_guard() -> PromptGuard:
