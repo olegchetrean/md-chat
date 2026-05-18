@@ -2,12 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
-import pytest
-
 from md_chat_ai.security.ai_safety import AIDisclosure, AISafetyFilter, get_disclosure
-
 
 # ---------------------------------------------------------------------------
 # AISafetyFilter — input/output classification + poisoning detection

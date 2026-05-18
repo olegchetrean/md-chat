@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from md_chat_ai.agents.message_optimizer import (
     MessageOptimizer,
     MessageVariant,

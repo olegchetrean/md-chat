@@ -13,7 +13,7 @@ The Cronberry-derived twin code calls ``self.llm.chat(...)`` and
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 

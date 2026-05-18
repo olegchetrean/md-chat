@@ -6,11 +6,8 @@ with ``new_callable=property`` or by replacing CONFIG itself with a dataclass re
 
 from __future__ import annotations
 
-import logging
 from dataclasses import replace
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from md_chat_ai import wsgi
 
