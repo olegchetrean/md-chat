@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-License-Identifier: AGPL-3.0-or-later
+Copyright (c) 2026 Mega Promoting SRL
+MD-Chat Android — Ukrainian (uk, subset)
+-->
+<resources>
+    <string name="app_name">MD-Chat</string>
+    <string name="login">Увійти</string>
+    <string name="logout">Вийти</string>
+    <string name="settings">Налаштування</string>
+    <string name="privacy">Конфіденційність</string>
+    <string name="send">Надіслати</string>
+    <string name="new_message">Нове повідомлення</string>
+    <string name="contacts">Контакти</string>
+    <string name="rooms">Кімнати</string>
+    <string name="call">Виклик</string>
+    <string name="video_call">Відеовиклик</string>
+    <string name="search">Пошук</string>
+    <string name="about">Про застосунок</string>
+    <string name="export_my_data">Експортувати мої дані</string>
+    <string name="delete_account">Видалити обліковий запис</string>
+    <string name="ai_disclosure_title">Вбудований AI</string>
+    <string name="ai_disclosure_accept">Зрозуміло</string>
+    <string name="cancel">Скасувати</string>
+    <string name="save">Зберегти</string>
+</resources>

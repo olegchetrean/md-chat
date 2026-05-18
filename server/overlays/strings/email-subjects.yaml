@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-FileCopyrightText: 2026 Mega Promoting SRL
+#
+# email-subjects.yaml — Python-source patches for email subject lines.
+#
+# Synapse hard-codes outbound email subjects in Python (NOT in templates),
+# so we cannot fix these via Jinja overlays. Each entry below targets a
+# specific .py file and the exact subject literal.
+#
+# Per `docs/synapse-rebrand-plan.md` §3.7, the affected files are:
+#   synapse/handlers/identity.py   (registration confirmation, password reset)
+#   synapse/push/mailer.py         (notification "new activity" emails)
+#
+# We chose Romanian-leaning subject lines because >70% of MD-Chat users will
+# be Moldova-resident at launch. The English fallback is the body itself
+# (which we localise via Jinja `_locale` resolution).
+#
+# Drift warning: if upstream changes one of these subject literals, the
+# string-replace below will match zero occurrences and apply-overlays.sh
+# will fail. That is the desired behaviour — we want a build break, not a
+# silent regression to "[Synapse]" subjects.
+
+version: 1
+description: >-
+  Replace Synapse hard-coded email subject prefixes with MD-Chat-branded,
+  Romanian-localised equivalents.
+
+entries:
+  # ------------------------------------------------------------------
+  # Email validation during registration / 3PID add
+  # synapse/handlers/identity.py — function send_threepid_validation_email
+  # ------------------------------------------------------------------
+  - path: "synapse/handlers/identity.py"
+    replace:
+      - ["[%s] Confirm your email address for Matrix",
+         "[%s] Confirma adresa de email pentru MD-Chat"]
+      - ["[%s] Validate your email",
+         "[%s] Confirma adresa de email pentru MD-Chat"]
+      - ["[%s] Password reset",
+         "[%s] Resetare parola MD-Chat"]
+      - ["[%s] Confirm adding email",
+         "[%s] Confirma adaugarea adresei de email pe MD-Chat"]
+      - ["[%s] Confirm adding phone number",
+         "[%s] Confirma adaugarea numarului de telefon pe MD-Chat"]
+
+  # ------------------------------------------------------------------
+  # Push notification emails ("you have new messages in <room>")
+  # synapse/push/mailer.py — MESSAGE_FROM_PERSON / MESSAGES_IN_ROOM templates
+  # ------------------------------------------------------------------
+  - path: "synapse/push/mailer.py"
+    replace:
+      - ["[%s] New activity in room",
+         "[%s] Activitate noua in MD-Chat"]
+      - ["[%s] %d new messages",
+         "[%s] %d mesaje noi pe MD-Chat"]
+      - ["[%(app)s] You have %(count)d new messages",
+         "[%(app)s] Aveti %(count)d mesaje noi pe MD-Chat"]
+      # The "app_name" branding inside mailer.py default
+      - ["app_name=\"Matrix\"", "app_name=\"MD-Chat\""]
+
+  # ------------------------------------------------------------------
+  # Account validity / expiry warnings (only fires if account_validity is on,
+  # which we plan to enable in Sprint 5 for soft-delete grace periods).
+  # synapse/handlers/account_validity.py
+  # ------------------------------------------------------------------
+  - path: "synapse/handlers/account_validity.py"
+    replace:
+      - ["Renew your %s account",
+         "Reinnoieste contul tau MD-Chat"]
+      - ["[%s] Account renewed",
+         "[%s] Contul MD-Chat a fost reinnoit"]
+
+  # ------------------------------------------------------------------
+  # Sender display fallback when notif_from is empty. This is operator
+  # error-recovery; the actual notif_from is set in homeserver.yaml. But the
+  # fallback should still be MD-Chat-branded so a forgotten config doesn't
+  # leak "Synapse" into a user's inbox.
+  # synapse/config/emailconfig.py
+  # ------------------------------------------------------------------
+  - path: "synapse/config/emailconfig.py"
+    replace:
+      - ["app_name = \"Matrix\"",
+         "app_name = \"MD-Chat\""]
+      - ["DEFAULT_SUBJECTS",  # marker - we keep upstream's dict structure
+         "DEFAULT_SUBJECTS"]  # but this no-op forces a glob match check

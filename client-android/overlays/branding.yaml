@@ -1,0 +1,23 @@
+# MD-Chat Android branding overlay
+# Applied by scripts/apply-branding.sh after upstream clone.
+
+replacements:
+  - pattern: "Element X"
+    replacement: "MD-Chat"
+    paths: ["**/*.kt", "**/*.xml", "**/*.gradle*"]
+
+  - pattern: "io\\.element\\.android\\.x"
+    replacement: "eu.mdchat.app"
+    paths: ["**/*.kt", "**/*.gradle*", "**/AndroidManifest.xml"]
+
+  - pattern: "matrix\\.org"
+    replacement: "msg.md-chat.eu"
+    paths: ["**/HomeserverDefaults*.kt", "**/Configuration*.kt"]
+
+  - pattern: "support@element\\.io"
+    replacement: "support@md-chat.eu"
+    paths: ["**/*.kt", "**/*.xml"]
+
+  - pattern: "https://element\\.io/help"
+    replacement: "https://md-chat.eu/help"
+    paths: ["**/*.kt", "**/*.xml"]

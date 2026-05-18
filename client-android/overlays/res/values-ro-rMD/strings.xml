@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-License-Identifier: AGPL-3.0-or-later
+Copyright (c) 2026 Mega Promoting SRL
+MD-Chat Android — Romanian (Moldova baseline) ro-rMD
+-->
+<resources>
+    <string name="app_name">MD-Chat</string>
+    <string name="login">Autentificare</string>
+    <string name="logout">Deconectare</string>
+    <string name="settings">Setări</string>
+    <string name="privacy">Confidențialitate</string>
+    <string name="security">Securitate</string>
+    <string name="send">Trimite</string>
+    <string name="receive">Primește</string>
+    <string name="new_message">Mesaj nou</string>
+    <string name="contacts">Contacte</string>
+    <string name="rooms">Camere</string>
+    <string name="groups">Grupuri</string>
+    <string name="channels">Canale</string>
+    <string name="call">Apel</string>
+    <string name="video_call">Apel video</string>
+    <string name="voice_message">Mesaj vocal</string>
+    <string name="attach_file">Atașează fișier</string>
+    <string name="search">Caută</string>
+    <string name="about">Despre</string>
+    <string name="help">Ajutor</string>
+    <string name="feedback">Sugestii</string>
+    <string name="export_my_data">Exportă datele mele</string>
+    <string name="delete_account">Șterge contul</string>
+    <string name="verify_with_evo">Verifică cu EVO</string>
+    <string name="ai_disclosure_title">AI integrat</string>
+    <string name="ai_disclosure_body">Sunteți pe cale să folosiți o funcție bazată pe inteligență artificială. Conținutul rămâne criptat end-to-end. Procesarea se realizează pe device sau în confidential compute.</string>
+    <string name="ai_disclosure_accept">Am înțeles</string>
+    <string name="ai_disclosure_learn_more">Politica de confidențialitate</string>
+    <string name="continue_">Continuă</string>
+    <string name="cancel">Anulează</string>
+    <string name="save">Salvează</string>
+</resources>

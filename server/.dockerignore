@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Keep the build context minimal — only what apply-overlays.sh needs.
+
+# Editor / VCS noise
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# CI / local-only files
+.github
+*.log
+*.bak
+*.orig
+*.rej
+
+# Build artefacts (the upstream clone happens *inside* the container)
+build-tmp/
+dist/
+*.tar.gz
+*.zip
+
+# Documentation that does not affect the runtime image
+CHANGELOG.md
+README.md
+LICENSE
+NOTICE
+
+# Test scratch
+tests/
+test-results/
+
+# Anything outside server/ — defensive (build context is server/ only, but
+# protect against accidental wider context).
+../*
+!../server/

@@ -1,0 +1,35 @@
+/* MD-Chat iOS — Russian */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (c) 2026 Mega Promoting SRL */
+
+"app_name" = "MD-Chat";
+"login" = "Вход";
+"logout" = "Выход";
+"settings" = "Настройки";
+"privacy" = "Конфиденциальность";
+"security" = "Безопасность";
+"send" = "Отправить";
+"receive" = "Получить";
+"new_message" = "Новое сообщение";
+"contacts" = "Контакты";
+"rooms" = "Комнаты";
+"groups" = "Группы";
+"channels" = "Каналы";
+"call" = "Звонок";
+"video_call" = "Видеозвонок";
+"voice_message" = "Голосовое сообщение";
+"attach_file" = "Прикрепить файл";
+"search" = "Поиск";
+"about" = "О приложении";
+"help" = "Помощь";
+"feedback" = "Обратная связь";
+"export_my_data" = "Экспорт моих данных";
+"delete_account" = "Удалить аккаунт";
+"verify_with_evo" = "Подтвердить через EVO";
+"ai_disclosure_title" = "Встроенный AI";
+"ai_disclosure_body" = "Вы собираетесь использовать функцию на базе ИИ. Содержимое остаётся зашифрованным end-to-end. Обработка выполняется на устройстве или в confidential compute.";
+"ai_disclosure_accept" = "Понятно";
+"ai_disclosure_learn_more" = "Политика конфиденциальности";
+"continue" = "Продолжить";
+"cancel" = "Отмена";
+"save" = "Сохранить";

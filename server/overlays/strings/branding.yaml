@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-FileCopyrightText: 2026 Mega Promoting SRL
+#
+# branding.yaml — top-level brand-string rebrand table.
+#
+# Scope: user-facing strings only. Operator-facing strings (log messages,
+# Python class names like SynapseHomeServer, metric labels) are intentionally
+# left untouched so this fork stays greppable against upstream documentation.
+#
+# Out of scope (handled elsewhere):
+#   - Subject lines set in Python source       → email-subjects.yaml
+#   - Email body templates                     → ../templates/*.html.j2
+#   - The /source disclosure route             → ../patches/0001-*.patch
+#
+# Word boundaries: this overlay does string-replace, not regex. We rely on
+# upstream's habit of writing brand strings as standalone capitalised words
+# inside HTML/Jinja, so "Element" rarely collides with "elements" or
+# "elementary" in user-facing text.
+
+version: 1
+description: >-
+  Element / Riot / Vector → MD-Chat. Default server host → msg.md-chat.eu.
+  Support contact → support@md-chat.eu. report_stats default → false.
+
+entries:
+  # ------------------------------------------------------------------
+  # Email templates (HTML + plaintext)
+  # ------------------------------------------------------------------
+  - path: "synapse/res/templates/*.html"
+    replace:
+      - ["Element", "MD-Chat"]
+      - ["Riot", "MD-Chat"]
+      - ["Vector", "MD-Chat"]
+      - ["element.io/help", "md-chat.eu/help"]
+      - ["element.io", "md-chat.eu"]
+      - ["riot.im", "md-chat.eu"]
+      - ["Matrix account on", "MD-Chat account on"]
+      - ["your Matrix account", "your MD-Chat account"]
+      - ["your Matrix homeserver", "your MD-Chat homeserver"]
+
+  - path: "synapse/res/templates/*.txt"
+    replace:
+      - ["Element", "MD-Chat"]
+      - ["Riot", "MD-Chat"]
+      - ["Vector", "MD-Chat"]
+      - ["element.io/help", "md-chat.eu/help"]
+      - ["your Matrix account", "your MD-Chat account"]
+      - ["your Matrix homeserver", "your MD-Chat homeserver"]
+
+  # ------------------------------------------------------------------
+  # Static landing & login pages
+  # ------------------------------------------------------------------
+  - path: "synapse/static/index.html"
+    replace:
+      - ["It works! Synapse is running",
+         "MD-Chat msg.md-chat.eu — operational"]
+      - ["Your Synapse server is listening",
+         "This is the MD-Chat homeserver. Download the app at md-chat.eu."]
+      - ["Welcome to the Matrix universe :)",
+         "Operated by Mega Promoting SRL — contact: support@md-chat.eu"]
+
+  - path: "synapse/static/client/login/index.html"
+    replace:
+      - ["<title>Login</title>", "<title>MD-Chat — Autentificare</title>"]
+
+  # ------------------------------------------------------------------
+  # SSO templates — default support contact and brand mention
+  # ------------------------------------------------------------------
+  - path: "synapse/res/templates/sso_account_deactivated.html"
+    replace:
+      - ["Please contact your homeserver administrator",
+         "Please contact support@md-chat.eu"]
+
+  - path: "synapse/res/templates/sso_error.html"
+    replace:
+      - ["support@example.com", "support@md-chat.eu"]
+
+  # ------------------------------------------------------------------
+  # Server-side defaults that leak into config-generation output
+  # (Synapse writes a default homeserver.yaml on `generate`; we want our
+  # brand defaults baked in even if the operator forgets to edit.)
+  # ------------------------------------------------------------------
+  - path: "docker/conf/homeserver.yaml"
+    replace:
+      - ["server_name: \"SERVER_NAME\"",
+         "server_name: \"msg.md-chat.eu\""]
+      - ["report_stats: REPORT_STATS",
+         "report_stats: false"]
+      - ["# admin_contact: 'mailto:admin@server.com'",
+         "admin_contact: 'mailto:admin@md-chat.eu'"]
+    dry_run: false
+
+  - path: "synapse/config/server.py"
+    replace:
+      # Default "homeserver_name" hint in generated docs / errors. Plain text,
+      # not a Python identifier — safe to rewrite.
+      - ["matrix.example.com", "msg.md-chat.eu"]

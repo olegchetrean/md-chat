@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-License-Identifier: AGPL-3.0-or-later
+Copyright (c) 2026 Mega Promoting SRL
+MD-Chat Android — Russian (ru, Cyrillic native)
+-->
+<resources>
+    <string name="app_name">MD-Chat</string>
+    <string name="login">Вход</string>
+    <string name="logout">Выход</string>
+    <string name="settings">Настройки</string>
+    <string name="privacy">Конфиденциальность</string>
+    <string name="security">Безопасность</string>
+    <string name="send">Отправить</string>
+    <string name="receive">Получить</string>
+    <string name="new_message">Новое сообщение</string>
+    <string name="contacts">Контакты</string>
+    <string name="rooms">Комнаты</string>
+    <string name="groups">Группы</string>
+    <string name="channels">Каналы</string>
+    <string name="call">Звонок</string>
+    <string name="video_call">Видеозвонок</string>
+    <string name="voice_message">Голосовое сообщение</string>
+    <string name="attach_file">Прикрепить файл</string>
+    <string name="search">Поиск</string>
+    <string name="about">О приложении</string>
+    <string name="help">Помощь</string>
+    <string name="feedback">Обратная связь</string>
+    <string name="export_my_data">Экспорт моих данных</string>
+    <string name="delete_account">Удалить аккаунт</string>
+    <string name="verify_with_evo">Подтвердить через EVO</string>
+    <string name="ai_disclosure_title">Встроенный AI</string>
+    <string name="ai_disclosure_body">Вы собираетесь использовать функцию на базе ИИ. Содержимое остаётся зашифрованным end-to-end. Обработка выполняется на устройстве или в confidential compute.</string>
+    <string name="ai_disclosure_accept">Понятно</string>
+    <string name="ai_disclosure_learn_more">Политика конфиденциальности</string>
+    <string name="continue_">Продолжить</string>
+    <string name="cancel">Отмена</string>
+    <string name="save">Сохранить</string>
+</resources>

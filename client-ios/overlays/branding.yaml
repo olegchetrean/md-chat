@@ -1,0 +1,28 @@
+# MD-Chat iOS branding overlay
+# Applied by scripts/apply-branding.sh after upstream clone.
+# Patterns are Python regex; replacements are plain strings (no backreferences).
+
+replacements:
+  - pattern: "Element X"
+    replacement: "MD-Chat"
+    paths: ["**/*.swift", "**/*.strings", "**/*.plist", "**/project.yml"]
+
+  - pattern: "Element"
+    replacement: "MD-Chat"
+    paths: ["**/*.strings"]
+
+  - pattern: "io\\.element\\.elementx"
+    replacement: "eu.mdchat.app"
+    paths: ["**/*.swift", "**/*.plist", "**/project.yml"]
+
+  - pattern: "matrix\\.org"
+    replacement: "msg.md-chat.eu"
+    paths: ["**/HomeserverDefaults*.swift", "**/Configuration*.swift"]
+
+  - pattern: "support@element\\.io"
+    replacement: "support@md-chat.eu"
+    paths: ["**/*.swift", "**/*.strings", "**/*.plist"]
+
+  - pattern: "https://element\\.io/help"
+    replacement: "https://md-chat.eu/help"
+    paths: ["**/*.swift", "**/*.strings", "**/*.plist"]

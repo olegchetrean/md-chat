@@ -17,6 +17,7 @@ def create_app(
     register_identity: bool = True,
     register_auth: bool = True,
     register_eevidence: bool = True,
+    register_twin: bool = True,
 ) -> Flask:
     app = Flask(__name__)
 
@@ -48,6 +49,15 @@ def create_app(
             app.register_blueprint(eevidence_bp, url_prefix="/api")
         except Exception:  # pragma: no cover
             logger.exception("eevidence blueprint failed to register; continuing")
+
+    # Digital Twin engine (chat / profile / revoke / audit / attest).
+    if register_twin:
+        try:
+            from .twin import bp as twin_bp
+
+            app.register_blueprint(twin_bp, url_prefix="/api/v1/twin")
+        except Exception:  # pragma: no cover
+            logger.exception("twin blueprint failed to register; continuing")
 
     # MPass SAML SP + OIDC bridge + MSign client.
     if register_identity:

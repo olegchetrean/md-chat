@@ -1,0 +1,1481 @@
+openapi: 3.1.0
+info:
+  title: MD-Chat AI Layer HTTP API
+  version: 0.1.0-alpha
+  summary: Sovereign messenger AI organizing layer + identity + eEvidence portal
+  description: |
+    HTTP surface of the MD-Chat AI organizing layer (`md_chat_ai`), a Flask
+    WSGI application that ships with the MD-Chat sovereign messenger stack.
+
+    The API has five concerns:
+
+    * **health** — liveness and readiness probes for orchestrators.
+    * **auth** — phone OTP, TOTP MFA, and PIN-wrapped identity-key backup.
+    * **identity** — MPass SAML SP, MSign qualified signing, and the OIDC bridge.
+    * **eevidence** — EU eEvidence Regulation 2023/1543 production order portal.
+    * **oidc** — discovery, authorize, token, userinfo, JWKS at the application root.
+
+    All non-public operator endpoints require the
+    `X-MDChat-Internal-Token` header (constant-time compared against
+    `$EEVIDENCE_INTERNAL_TOKEN`). OIDC `userinfo` requires a Bearer access
+    token from `/oidc/token`.
+
+    Errors share a consistent shape:
+
+    ```json
+    {"ok": false, "error": "error_code", "details": {}}
+    ```
+
+    PII (phone numbers, codes, PINs) is hashed or AEAD-wrapped before any
+    persistence and is never logged.
+  contact:
+    name: Mega Promoting SRL
+    email: contact@md-chat.eu
+    url: https://md-chat.eu
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: https://msg.md-chat.eu
+    description: Production (EU, Hetzner FSN1)
+  - url: http://localhost:5002
+    description: Local development (Flask dev server)
+tags:
+  - name: health
+    description: Liveness and readiness probes.
+  - name: auth
+    description: Phone OTP, TOTP MFA, PIN-wrapped identity backup.
+  - name: identity
+    description: MPass SAML SP + MSign qualified signature.
+  - name: eevidence
+    description: EU eEvidence Regulation 2023/1543 production order portal.
+  - name: oidc
+    description: OpenID Connect bridge — discovery, authorize, token, userinfo, JWKS.
+
+# ---------------------------------------------------------------------------
+# Security schemes
+# ---------------------------------------------------------------------------
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        ID/access token issued by `POST /oidc/token`. Used to authenticate
+        calls to `/oidc/userinfo`. Token TTL defaults to 600 s.
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-MDChat-Internal-Token
+      description: |
+        Shared secret enforced via constant-time compare against
+        `$EEVIDENCE_INTERNAL_TOKEN`. Required by every operator-only
+        eEvidence endpoint (`/respond`, `/emergency-mark`, `/register*`).
+
+  # -------------------------------------------------------------------------
+  # Schemas
+  # -------------------------------------------------------------------------
+  schemas:
+    Error:
+      type: object
+      description: Consistent error envelope used across every endpoint.
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        error:
+          type: string
+          description: Machine-readable error code (no free-form text).
+          examples: ["missing_fields", "invalid_code", "not_found", "unauthorized"]
+        details:
+          type: object
+          additionalProperties: true
+          description: Optional structured detail (Pydantic ValidationError, etc.).
+      examples:
+        - ok: false
+          error: missing_fields
+          details: {}
+
+    HealthResponse:
+      type: object
+      required: [status, service, version, timestamp]
+      properties:
+        status:
+          type: string
+          const: healthy
+        service:
+          type: string
+          const: md-chat-ai
+        version:
+          type: string
+          examples: ["0.1.0-alpha"]
+        timestamp:
+          type: string
+          format: date-time
+        config:
+          type: object
+          properties:
+            neo4j_configured: {type: boolean}
+            router_configured: {type: boolean}
+            infobip_configured: {type: boolean}
+        ai_act_disclosure:
+          type: boolean
+          description: Confirms EU AI Act Art. 50 disclosure layer is active.
+
+    ReadyResponse:
+      type: object
+      required: [ready]
+      properties:
+        ready: {type: boolean}
+        reason:
+          type: string
+          examples: ["config_incomplete"]
+
+    PhoneSendCodeRequest:
+      type: object
+      required: [phone_number, country_code, user_id]
+      properties:
+        phone_number:
+          type: string
+          description: E.164-compatible local number, no leading "+".
+          examples: ["79123456"]
+        country_code:
+          type: string
+          description: ISO 3166-1 alpha-2 country code.
+          examples: ["MD", "RO", "UA"]
+        user_id:
+          type: string
+          format: uuid
+
+    PhoneVerifyRequest:
+      type: object
+      required: [code, user_id]
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 8
+          examples: ["482103"]
+        user_id:
+          type: string
+          format: uuid
+
+    PhoneSendCodeResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: {type: boolean}
+        cooldown_until:
+          type: integer
+          description: Unix epoch when the cooldown expires (only on 429).
+
+    MFASetupRequest:
+      type: object
+      required: [account_name]
+      properties:
+        account_name:
+          type: string
+          examples: ["oleg@md-chat.eu"]
+        user_id:
+          type: string
+          description: Fallback used if account_name absent.
+
+    MFASetupResponse:
+      type: object
+      required: [ok, qr_uri, secret, backup_codes, backup_hashes]
+      properties:
+        ok: {type: boolean}
+        qr_uri:
+          type: string
+          description: otpauth:// URI for QR rendering.
+          examples: ["otpauth://totp/MD-Chat:oleg@md-chat.eu?secret=JBSWY3DPEHPK3PXP&issuer=MD-Chat"]
+        secret:
+          type: string
+          examples: ["JBSWY3DPEHPK3PXP"]
+        backup_codes:
+          type: array
+          description: Plaintext backup codes — shown ONCE.
+          items: {type: string}
+        backup_hashes:
+          type: array
+          description: Argon2id hashes; caller persists these.
+          items: {type: string}
+
+    MFAVerifyRequest:
+      type: object
+      required: [secret, code]
+      properties:
+        secret: {type: string}
+        code: {type: string}
+        backup_hashes:
+          type: array
+          items: {type: string}
+
+    MFAVerifyResponse:
+      type: object
+      required: [ok, method]
+      properties:
+        ok: {type: boolean}
+        method:
+          type: string
+          enum: [totp, backup]
+        remaining_hashes:
+          type: array
+          items: {type: string}
+
+    PINSetupRequest:
+      type: object
+      required: [user_id, pin, wrapped_keys_b64]
+      properties:
+        user_id: {type: string}
+        pin:
+          type: string
+          minLength: 4
+        wrapped_keys_b64:
+          type: string
+          description: Base64-encoded identity-key bundle (cleartext for wrap step).
+
+    PINBundle:
+      type: object
+      properties:
+        nonce_b64: {type: string}
+        ciphertext_b64: {type: string}
+        salt_b64: {type: string}
+        kdf:
+          type: string
+          const: argon2id
+
+    PINSetupResponse:
+      type: object
+      required: [ok, bundle]
+      properties:
+        ok: {type: boolean}
+        bundle:
+          $ref: "#/components/schemas/PINBundle"
+
+    PINRecoverRequest:
+      type: object
+      required: [user_id, pin]
+      properties:
+        user_id: {type: string}
+        pin: {type: string}
+
+    PINRecoverResponse:
+      type: object
+      required: [ok, wrapped_keys_b64]
+      properties:
+        ok: {type: boolean}
+        wrapped_keys_b64: {type: string}
+
+    SAMLMetadataResponse:
+      type: object
+      required: [entity_id, acs_url, slo_url, idp_metadata_url, settings]
+      properties:
+        entity_id:
+          type: string
+          examples: ["https://msg.md-chat.eu/sp"]
+        acs_url:
+          type: string
+          format: uri
+        slo_url:
+          type: string
+          format: uri
+        idp_metadata_url:
+          type: string
+          format: uri
+        settings:
+          type: object
+          additionalProperties: true
+
+    MSignSignRequest:
+      type: object
+      required: [document_b64]
+      properties:
+        document_b64:
+          type: string
+          description: Base64 of the document bytes to be signed.
+        mime_type:
+          type: string
+          default: application/pdf
+          examples: ["application/pdf", "application/xml"]
+
+    MSignSignResponse:
+      type: object
+      required: [signature_id, signed_document_b64, certificate_chain]
+      properties:
+        signature_id: {type: string}
+        signed_document_b64: {type: string}
+        certificate_chain:
+          type: array
+          items: {type: string}
+
+    ProductionOrder:
+      type: object
+      description: |
+        EPOC (European Production Order Certificate) — Art. 5 of EU
+        Regulation 2023/1543. Validated by Pydantic; unknown fields are
+        rejected. See md_chat_ai.eevidence.portal for the canonical schema.
+      required: [case_reference, issuing_authority_id, contact_email, data_categories, urgency_level]
+      properties:
+        case_reference:
+          type: string
+          examples: ["RO/PCA/2026/00123"]
+        issuing_authority_id:
+          type: string
+          examples: ["RO-PCA-BUC"]
+        contact_email:
+          type: string
+          format: email
+        data_categories:
+          type: array
+          items:
+            type: string
+            enum: [subscriber, traffic, content]
+        urgency_level:
+          type: string
+          enum: [standard, expedited, emergency]
+        legal_basis:
+          type: string
+        deadline_iso:
+          type: string
+          format: date-time
+        target_user_id:
+          type: string
+
+    PreservationOrder:
+      type: object
+      description: EPOC-PR (Art. 9) — preservation order.
+      required: [case_reference, issuing_authority_id, contact_email, target_user_id]
+      properties:
+        case_reference: {type: string}
+        issuing_authority_id: {type: string}
+        contact_email: {type: string, format: email}
+        target_user_id: {type: string}
+        preservation_until:
+          type: string
+          format: date-time
+
+    OrderResponse:
+      type: object
+      description: Operator response payload for `respond`.
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [produced, refused, partial, escalated]
+        notes: {type: string}
+        produced_artifact_b64:
+          type: string
+          description: Base64 of the produced evidence bundle (optional).
+
+    Ticket:
+      type: object
+      required: [ticket_id, status, urgency_level, created_at]
+      properties:
+        ticket_id: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [received, in_review, responded, refused, escalated]
+        urgency_level:
+          type: string
+          enum: [standard, expedited, emergency, preservation]
+        created_at: {type: string, format: date-time}
+        sla_deadline:
+          type: string
+          format: date-time
+        case_reference: {type: string}
+        issuing_authority_id: {type: string}
+        payload:
+          description: Original order — stripped from public ticket view.
+          oneOf:
+            - $ref: "#/components/schemas/ProductionOrder"
+            - $ref: "#/components/schemas/PreservationOrder"
+
+    TicketEnvelope:
+      type: object
+      required: [ticket]
+      properties:
+        ticket:
+          $ref: "#/components/schemas/Ticket"
+
+    OpenTicketsEnvelope:
+      type: object
+      required: [open_tickets]
+      properties:
+        open_tickets:
+          type: array
+          items: {$ref: "#/components/schemas/Ticket"}
+
+    RegisterEnvelope:
+      type: object
+      required: [chain_valid, entries]
+      properties:
+        chain_valid: {type: boolean}
+        entries:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    EmergencyMarkRequest:
+      type: object
+      required: [ticket_id]
+      properties:
+        ticket_id: {type: string, format: uuid}
+        justification: {type: string}
+
+    RespondRequest:
+      type: object
+      required: [ticket_id, response]
+      properties:
+        ticket_id: {type: string, format: uuid}
+        response:
+          $ref: "#/components/schemas/OrderResponse"
+
+    OIDCDiscoveryDocument:
+      type: object
+      description: RFC 8414 / OpenID Connect Discovery 1.0.
+      additionalProperties: true
+      properties:
+        issuer: {type: string, format: uri}
+        authorization_endpoint: {type: string, format: uri}
+        token_endpoint: {type: string, format: uri}
+        userinfo_endpoint: {type: string, format: uri}
+        jwks_uri: {type: string, format: uri}
+        response_types_supported:
+          type: array
+          items: {type: string}
+        subject_types_supported:
+          type: array
+          items: {type: string}
+        id_token_signing_alg_values_supported:
+          type: array
+          items: {type: string}
+
+    JWKSResponse:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    OIDCTokenResponse:
+      type: object
+      required: [access_token, id_token, token_type, expires_in]
+      properties:
+        access_token: {type: string}
+        id_token: {type: string}
+        token_type:
+          type: string
+          const: Bearer
+        expires_in:
+          type: integer
+          examples: [600]
+        scope: {type: string}
+
+    UserInfoResponse:
+      type: object
+      additionalProperties: true
+      properties:
+        sub: {type: string}
+        name: {type: string}
+        idnp:
+          type: string
+          description: Moldovan personal identification number (only when scope=idnp).
+
+  # -------------------------------------------------------------------------
+  # Reusable responses
+  # -------------------------------------------------------------------------
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+          examples:
+            unauthorized:
+              value:
+                ok: false
+                error: unauthorized
+                details: {}
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+          examples:
+            not_found:
+              value:
+                ok: false
+                error: not_found
+                details: {}
+    ValidationFailed:
+      description: Pydantic validation rejected the body.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+          examples:
+            validation_failed:
+              value:
+                error: validation_failed
+                details:
+                  - loc: ["case_reference"]
+                    msg: field required
+                    type: missing
+
+# ===========================================================================
+# Paths
+# ===========================================================================
+paths:
+
+  /api/health:
+    get:
+      tags: [health]
+      summary: Service liveness
+      description: |
+        Returns a static healthy response. Used by k8s/Docker liveness probes.
+        Does NOT perform side-effects or downstream checks.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is alive.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HealthResponse"}
+              examples:
+                healthy:
+                  value:
+                    status: healthy
+                    service: md-chat-ai
+                    version: 0.1.0-alpha
+                    timestamp: "2026-05-18T09:32:18.000Z"
+                    config:
+                      neo4j_configured: true
+                      router_configured: true
+                      infobip_configured: true
+                    ai_act_disclosure: true
+        "500":
+          description: Unexpected internal error (Flask error handler).
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                internal:
+                  value: {ok: false, error: internal_error, details: {}}
+
+  /api/ready:
+    get:
+      tags: [health]
+      summary: Service readiness
+      description: |
+        Verifies critical config flags (Neo4j password, Router key,
+        Infobip key) before returning 200. Returns 503 if any are missing.
+      operationId: getReady
+      responses:
+        "200":
+          description: Service is ready to accept traffic.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReadyResponse"}
+              examples:
+                ready:
+                  value:
+                    ready: true
+        "503":
+          description: Configuration incomplete.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReadyResponse"}
+              examples:
+                not_ready:
+                  value:
+                    ready: false
+                    reason: config_incomplete
+
+  # =======================================================================
+  # AUTH
+  # =======================================================================
+
+  /api/v1/auth/phone/send-code:
+    post:
+      tags: [auth]
+      summary: Send phone OTP via Infobip
+      description: |
+        Sends a 6-digit one-time code via Infobip SMS. Implements a per-user
+        cooldown (default 60 s). The `Accept-Language` header drives the
+        SMS template locale (RO/EN/RU/UK).
+      operationId: postPhoneSendCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PhoneSendCodeRequest"}
+            examples:
+              md_number:
+                value:
+                  phone_number: "79123456"
+                  country_code: MD
+                  user_id: 6f1a8e64-9b9c-4f24-9a86-2b8d1c4d5e6f
+      responses:
+        "200":
+          description: Code dispatched.
+          content:
+            application/json:
+              examples:
+                ok:
+                  value: {ok: true}
+              schema:
+                type: object
+                properties:
+                  ok: {type: boolean}
+        "400":
+          description: Invalid input or Infobip failure.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {ok: false, error: missing_fields}
+        "429":
+          description: Cooldown active or per-IP throttle hit.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PhoneSendCodeResponse"}
+              examples:
+                cooldown:
+                  value: {ok: false, error: cooldown_active, cooldown_until: 1747559500}
+
+  /api/v1/auth/phone/verify:
+    post:
+      tags: [auth]
+      summary: Verify phone OTP
+      description: |
+        Validates the 6-digit code against the Argon2id-hashed record.
+        Increments an attempt counter; locks the row after 5 failures.
+      operationId: postPhoneVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PhoneVerifyRequest"}
+            examples:
+              verify:
+                value:
+                  code: "482103"
+                  user_id: 6f1a8e64-9b9c-4f24-9a86-2b8d1c4d5e6f
+      responses:
+        "200":
+          description: Code matches and phone is now verified.
+          content:
+            application/json:
+              examples:
+                ok:
+                  value: {ok: true}
+              schema:
+                type: object
+                properties:
+                  ok: {type: boolean}
+        "400":
+          description: Code mismatch or expired.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                invalid:
+                  value: {ok: false, error: invalid_code}
+        "429":
+          description: Too many failed attempts.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                locked:
+                  value: {ok: false, error: too_many_attempts}
+
+  /api/v1/auth/mfa/setup:
+    post:
+      tags: [auth]
+      summary: Initialize TOTP MFA
+      description: |
+        Generates a new TOTP secret, otpauth:// URI for QR rendering, and
+        ten one-time backup codes. The plaintext backup codes are returned
+        ONCE; only their Argon2id hashes should be persisted.
+      operationId: postMfaSetup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MFASetupRequest"}
+            examples:
+              setup:
+                value: {account_name: "oleg@md-chat.eu"}
+      responses:
+        "200":
+          description: Setup bundle.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MFASetupResponse"}
+              examples:
+                bundle:
+                  value:
+                    ok: true
+                    qr_uri: otpauth://totp/MD-Chat:oleg@md-chat.eu?secret=JBSWY3DPEHPK3PXP&issuer=MD-Chat
+                    secret: JBSWY3DPEHPK3PXP
+                    backup_codes: ["A1B2-C3D4", "E5F6-G7H8"]
+                    backup_hashes: ["$argon2id$v=19$...", "$argon2id$v=19$..."]
+        "400":
+          description: Missing `account_name`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {ok: false, error: missing_account_name}
+
+  /api/v1/auth/mfa/verify:
+    post:
+      tags: [auth]
+      summary: Verify TOTP code
+      description: |
+        Validates a 6-digit TOTP code (±1 step window) or falls back to a
+        backup code if `backup_hashes` is supplied.
+      operationId: postMfaVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MFAVerifyRequest"}
+            examples:
+              totp:
+                value: {secret: JBSWY3DPEHPK3PXP, code: "482103"}
+      responses:
+        "200":
+          description: Code valid.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MFAVerifyResponse"}
+              examples:
+                totp_ok:
+                  value: {ok: true, method: totp}
+                backup_ok:
+                  value: {ok: true, method: backup, remaining_hashes: ["$argon2id$..."]}
+        "401":
+          description: Code invalid.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                invalid:
+                  value: {ok: false, error: invalid_code}
+
+  /api/v1/auth/pin/setup:
+    post:
+      tags: [auth]
+      summary: Setup PIN backup
+      description: |
+        Signal-SVR3-pattern stub. Wraps the supplied identity-key bundle
+        with the user's PIN (Argon2id KDF → AES-256-GCM). The server
+        stores only the AEAD ciphertext + nonce + salt.
+      operationId: postPinSetup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PINSetupRequest"}
+            examples:
+              setup:
+                value:
+                  user_id: 6f1a8e64-9b9c-4f24-9a86-2b8d1c4d5e6f
+                  pin: "183927"
+                  wrapped_keys_b64: "QkFTRTY0RU5DT0RFRA=="
+      responses:
+        "201":
+          description: Bundle stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PINSetupResponse"}
+              examples:
+                stored:
+                  value:
+                    ok: true
+                    bundle:
+                      nonce_b64: "BBBBBB..."
+                      ciphertext_b64: "CCCCCC..."
+                      salt_b64: "SSSSSS..."
+                      kdf: argon2id
+        "400":
+          description: Missing fields or invalid base64.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {ok: false, error: missing_fields}
+
+  /api/v1/auth/pin/recover:
+    post:
+      tags: [auth]
+      summary: Recover identity keys via PIN
+      description: Decrypts the previously-stored PIN bundle. Throws 401 if PIN mismatches.
+      operationId: postPinRecover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PINRecoverRequest"}
+            examples:
+              recover:
+                value:
+                  user_id: 6f1a8e64-9b9c-4f24-9a86-2b8d1c4d5e6f
+                  pin: "183927"
+      responses:
+        "200":
+          description: Bundle decrypted.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PINRecoverResponse"}
+              examples:
+                recovered:
+                  value:
+                    ok: true
+                    wrapped_keys_b64: "QkFTRTY0RU5DT0RFRA=="
+        "401":
+          description: PIN incorrect.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                invalid_pin:
+                  value: {ok: false, error: invalid_pin}
+        "404":
+          description: No bundle stored for that user.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                not_found:
+                  value: {ok: false, error: not_found}
+
+  # =======================================================================
+  # IDENTITY
+  # =======================================================================
+
+  /api/v1/identity/saml/metadata:
+    get:
+      tags: [identity]
+      summary: SAML SP metadata
+      description: |
+        JSON view over the SP entity descriptor — useful for ops dashboards.
+        For the IdP-consumable XML metadata, use the `entity_id` value and
+        request the corresponding XML endpoint published by ops.
+      operationId: getSamlMetadata
+      responses:
+        "200":
+          description: Service provider settings.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SAMLMetadataResponse"}
+              examples:
+                sp:
+                  value:
+                    entity_id: https://msg.md-chat.eu/sp
+                    acs_url: https://msg.md-chat.eu/api/v1/identity/saml/acs
+                    slo_url: https://msg.md-chat.eu/api/v1/identity/saml/slo
+                    idp_metadata_url: https://mpass.gov.md/metadata
+                    settings: {strict: true}
+        "500":
+          description: SAML SP failed to materialise (cert/key not loadable).
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                load_failure:
+                  value: {error: saml_sp_unavailable, detail: "cert path missing"}
+
+  /api/v1/identity/saml/acs:
+    post:
+      tags: [identity]
+      summary: SAML AssertionConsumerService
+      description: |
+        Consumes the IdP SAML response, translates the MPass assertion into
+        an authorization code, then 302-redirects back to the relying
+        party's `redirect_uri` with `code` + `state`.
+      operationId: postSamlAcs
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [SAMLResponse, RelayState]
+              properties:
+                SAMLResponse:
+                  type: string
+                  description: Base64-encoded SAML assertion.
+                RelayState:
+                  type: string
+                  description: Opaque token previously issued by /oidc/authorize.
+      responses:
+        "302":
+          description: Redirect to relying party with `code` + `state`.
+          headers:
+            Location:
+              schema: {type: string}
+              examples:
+                redirect: {value: "https://app.md-chat.eu/cb?code=abc&state=xyz"}
+        "400":
+          description: Missing RelayState or invalid SAML response.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {error: missing RelayState}
+                invalid:
+                  value: {error: invalid_saml_response, detail: "signature mismatch"}
+
+  /api/v1/identity/msign/sign:
+    post:
+      tags: [identity]
+      summary: MSign qualified signature
+      description: |
+        REST facade over the Moldovan MSign SOAP service. Accepts a
+        base64-encoded document, returns the signed payload + certificate
+        chain. Documents larger than 8 MB are rejected upstream.
+      operationId: postMsignSign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MSignSignRequest"}
+            examples:
+              pdf:
+                value:
+                  document_b64: "JVBERi0xLjQKJ..."
+                  mime_type: application/pdf
+      responses:
+        "200":
+          description: Signed bundle.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MSignSignResponse"}
+              examples:
+                signed:
+                  value:
+                    signature_id: ms_2026_00018273
+                    signed_document_b64: "JVBERi0xLjQKJ...signed..."
+                    certificate_chain: ["-----BEGIN CERTIFICATE-----..."]
+        "400":
+          description: Missing or invalid `document_b64`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {error: "document_b64 is required"}
+        "502":
+          description: MSign SOAP backend failure.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                msign_failure:
+                  value: {error: msign_failure, detail: "soap fault: invalid certificate"}
+
+  # =======================================================================
+  # eEvidence
+  # =======================================================================
+
+  /api/v1/legal/eevidence/submit:
+    post:
+      tags: [eevidence]
+      summary: Submit production order (EPOC)
+      description: |
+        Public-ish endpoint behind Cloudflare WAF. Validates a Pydantic
+        ProductionOrder, persists into the hash-chained audit log, returns
+        the opaque ticket id.
+      operationId: postEevidenceSubmit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ProductionOrder"}
+            examples:
+              standard:
+                value:
+                  case_reference: RO/PCA/2026/00123
+                  issuing_authority_id: RO-PCA-BUC
+                  contact_email: "prosecutor@pca.ro"
+                  data_categories: [subscriber]
+                  urgency_level: standard
+                  legal_basis: "Reg 2023/1543 Art 5"
+                  deadline_iso: "2026-05-28T00:00:00Z"
+                  target_user_id: tu_9988
+      responses:
+        "201":
+          description: Ticket created.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TicketEnvelope"}
+              examples:
+                created:
+                  value:
+                    ticket:
+                      ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                      status: received
+                      urgency_level: standard
+                      created_at: "2026-05-18T09:32:18Z"
+                      sla_deadline: "2026-05-28T00:00:00Z"
+                      case_reference: RO/PCA/2026/00123
+                      issuing_authority_id: RO-PCA-BUC
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/legal/eevidence/submit/emergency:
+    post:
+      tags: [eevidence]
+      summary: Submit emergency production order (8 h SLA)
+      description: |
+        Forces `urgency_level=emergency` server-side so emergency-grade
+        orders are never accepted accidentally. Starts the 8-hour SLA timer
+        immediately.
+      operationId: postEevidenceSubmitEmergency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ProductionOrder"}
+      responses:
+        "201":
+          description: Emergency ticket created.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TicketEnvelope"}
+              examples:
+                created:
+                  value:
+                    ticket:
+                      ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                      status: received
+                      urgency_level: emergency
+                      created_at: "2026-05-18T09:32:18Z"
+                      sla_deadline: "2026-05-18T17:32:18Z"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/legal/eevidence/submit/preservation:
+    post:
+      tags: [eevidence]
+      summary: Submit preservation order (EPOC-PR, Art. 9)
+      operationId: postEevidenceSubmitPreservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PreservationOrder"}
+            examples:
+              pr:
+                value:
+                  case_reference: RO/PCA/2026/00124-PR
+                  issuing_authority_id: RO-PCA-BUC
+                  contact_email: "prosecutor@pca.ro"
+                  target_user_id: tu_9988
+                  preservation_until: "2026-08-18T00:00:00Z"
+      responses:
+        "201":
+          description: Preservation ticket created.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TicketEnvelope"}
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/legal/eevidence/ticket/{ticket_id}:
+    get:
+      tags: [eevidence]
+      summary: Public ticket status
+      description: |
+        Sanitised view — the original payload is stripped to avoid leaking
+        case details. Issuing authorities authenticate the ticket using
+        `case_reference` + `contact_email` on file.
+      operationId: getEevidenceTicket
+      parameters:
+        - in: path
+          name: ticket_id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Ticket view.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TicketEnvelope"}
+              examples:
+                view:
+                  value:
+                    ticket:
+                      ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                      status: in_review
+                      urgency_level: standard
+                      created_at: "2026-05-18T09:32:18Z"
+                      sla_deadline: "2026-05-28T00:00:00Z"
+                      case_reference: RO/PCA/2026/00123
+                      issuing_authority_id: RO-PCA-BUC
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/legal/eevidence/respond:
+    post:
+      tags: [eevidence]
+      summary: Operator response (closes ticket)
+      security:
+        - InternalToken: []
+      operationId: postEevidenceRespond
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RespondRequest"}
+            examples:
+              produced:
+                value:
+                  ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                  response:
+                    outcome: produced
+                    notes: "subscriber data delivered via signed JSON"
+                    produced_artifact_b64: "JVBERi0xLjQKJ..."
+      responses:
+        "200":
+          description: Ticket closed.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TicketEnvelope"}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict — ticket already responded.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                conflict:
+                  value: {error: conflict, message: "ticket already responded"}
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/legal/eevidence/emergency-mark:
+    post:
+      tags: [eevidence]
+      summary: Promote existing ticket to emergency
+      security:
+        - InternalToken: []
+      operationId: postEevidenceEmergencyMark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EmergencyMarkRequest"}
+            examples:
+              promote:
+                value:
+                  ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                  justification: "Imminent threat to life — Art. 5(8)"
+      responses:
+        "200":
+          description: Ticket promoted, 8 h SLA started.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TicketEnvelope"}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Ticket already in a terminal state.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "422":
+          description: Missing justification or invalid state transition.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+
+  /api/v1/legal/eevidence/register/open:
+    get:
+      tags: [eevidence]
+      summary: List open tickets (operator dashboard)
+      security:
+        - InternalToken: []
+      operationId: getEevidenceRegisterOpen
+      responses:
+        "200":
+          description: Open tickets array.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpenTicketsEnvelope"}
+              examples:
+                open:
+                  value:
+                    open_tickets:
+                      - ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                        status: received
+                        urgency_level: emergency
+                        created_at: "2026-05-18T09:32:18Z"
+                        sla_deadline: "2026-05-18T17:32:18Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/legal/eevidence/register:
+    get:
+      tags: [eevidence]
+      summary: Internal audit register (full hash chain)
+      description: |
+        Returns the entire hash-chained audit log plus a boolean chain
+        validity check. Used by the DPO for quarterly reviews.
+      security:
+        - InternalToken: []
+      operationId: getEevidenceRegister
+      responses:
+        "200":
+          description: Audit register.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegisterEnvelope"}
+              examples:
+                register:
+                  value:
+                    chain_valid: true
+                    entries:
+                      - seq: 1
+                        action: submit
+                        ticket_id: 1f1f7d18-a04e-4f24-9a86-2b8d1c4d5e6f
+                        hash_prev: "0000"
+                        hash_self: "9a8b..."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # =======================================================================
+  # OIDC
+  # =======================================================================
+
+  /.well-known/openid-configuration:
+    get:
+      tags: [oidc]
+      summary: OIDC discovery document
+      description: |
+        Static document describing the OIDC bridge — issuer, supported
+        scopes (`openid`, `profile`, `email`, `idnp`), JWKS URI, etc.
+      operationId: getOidcDiscovery
+      responses:
+        "200":
+          description: Discovery document.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OIDCDiscoveryDocument"}
+              examples:
+                discovery:
+                  value:
+                    issuer: https://msg.md-chat.eu
+                    authorization_endpoint: https://msg.md-chat.eu/oidc/authorize
+                    token_endpoint: https://msg.md-chat.eu/oidc/token
+                    userinfo_endpoint: https://msg.md-chat.eu/oidc/userinfo
+                    jwks_uri: https://msg.md-chat.eu/oidc/jwks.json
+                    response_types_supported: [code]
+                    subject_types_supported: [public]
+                    id_token_signing_alg_values_supported: [RS256]
+        "500":
+          description: Unable to materialise discovery document (issuer misconfigured).
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                misconfig:
+                  value: {error: discovery_unavailable, detail: "issuer empty"}
+
+  /oidc/jwks.json:
+    get:
+      tags: [oidc]
+      summary: JWKS for ID token verification
+      operationId: getOidcJwks
+      responses:
+        "200":
+          description: JSON Web Key Set.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/JWKSResponse"}
+              examples:
+                jwks:
+                  value:
+                    keys:
+                      - kty: RSA
+                        use: sig
+                        alg: RS256
+                        kid: mdchat-2026-05
+                        n: "0vx7agoebGcQSuuPiL..."
+                        e: AQAB
+        "500":
+          description: Signing key not loaded.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                no_key:
+                  value: {error: signing_key_unavailable, details: {}}
+
+  /oidc/authorize:
+    get:
+      tags: [oidc]
+      summary: OIDC authorize endpoint
+      description: |
+        Begins the OIDC code-flow + PKCE. Build a SAML AuthnRequest under
+        the hood, then 302-redirect to the MPass IdP. The relying party is
+        eventually called back at `redirect_uri` with `code` + `state`.
+      operationId: getOidcAuthorize
+      parameters:
+        - in: query
+          name: client_id
+          required: true
+          schema: {type: string}
+        - in: query
+          name: redirect_uri
+          required: true
+          schema: {type: string, format: uri}
+        - in: query
+          name: scope
+          required: false
+          schema: {type: string, default: openid}
+          examples:
+            default: {value: "openid profile email"}
+            idnp: {value: "openid profile idnp"}
+        - in: query
+          name: state
+          required: false
+          schema: {type: string}
+        - in: query
+          name: nonce
+          required: false
+          schema: {type: string}
+        - in: query
+          name: code_challenge
+          required: false
+          schema: {type: string}
+        - in: query
+          name: code_challenge_method
+          required: false
+          schema: {type: string, enum: [S256, plain]}
+      responses:
+        "302":
+          description: Redirect to MPass IdP for SAML AuthnRequest.
+          headers:
+            Location:
+              schema: {type: string}
+              examples:
+                redirect: {value: "https://mpass.gov.md/sso?SAMLRequest=..."}
+        "400":
+          description: Invalid request (missing param, bad redirect_uri, etc.).
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {error: invalid_request, missing: client_id}
+        "500":
+          description: SAML SP unable to build AuthnRequest.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                saml_failure:
+                  value: {error: saml_failure, detail: "metadata refresh failed"}
+
+  /oidc/token:
+    post:
+      tags: [oidc]
+      summary: Exchange authorization code for tokens
+      description: |
+        Standard RFC 6749 token endpoint. Supports `authorization_code`
+        grant with optional PKCE. Public clients send `code_verifier`;
+        confidential clients send `client_secret`.
+      operationId: postOidcToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [code, client_id, redirect_uri]
+              properties:
+                code: {type: string}
+                client_id: {type: string}
+                client_secret: {type: string}
+                redirect_uri: {type: string, format: uri}
+                code_verifier: {type: string}
+                grant_type:
+                  type: string
+                  enum: [authorization_code]
+                  default: authorization_code
+      responses:
+        "200":
+          description: Token bundle.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OIDCTokenResponse"}
+              examples:
+                ok:
+                  value:
+                    access_token: at_3K9...
+                    id_token: eyJraWQiOiJtZGNoYXQtMjAyNi0wNSIsImFsZyI6IlJTMjU2In0...
+                    token_type: Bearer
+                    expires_in: 600
+                    scope: "openid profile email"
+        "400":
+          description: Bad request (invalid code, missing param, PKCE mismatch).
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                invalid_code:
+                  value: {error: invalid_grant, detail: "code expired"}
+
+  /oidc/userinfo:
+    get:
+      tags: [oidc]
+      summary: Get user claims (bearer auth)
+      description: |
+        Returns the OIDC claims for the authenticated subject. Claims
+        depend on the granted scopes — `idnp` only when explicitly
+        requested + consented at the MPass IdP.
+      security:
+        - BearerAuth: []
+      operationId: getOidcUserinfo
+      responses:
+        "200":
+          description: User claims.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/UserInfoResponse"}
+              examples:
+                claims:
+                  value:
+                    sub: 6f1a8e64-9b9c-4f24-9a86-2b8d1c4d5e6f
+                    name: "Ion Popescu"
+                    email: "ion@example.md"
+                    idnp: "2002004112233"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+              examples:
+                missing:
+                  value: {error: invalid_request}
+                expired:
+                  value: {error: invalid_token, detail: "expired"}

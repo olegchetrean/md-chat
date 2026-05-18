@@ -1,0 +1,97 @@
+{# SPDX-License-Identifier: AGPL-3.0-only #}
+{# SPDX-FileCopyrightText: 2026 Mega Promoting SRL #}
+{#
+   welcome.html.j2 — MD-Chat-branded welcome email sent on first sign-up.
+
+   Rendered by Synapse via the registration / 3PID flow. Receives the
+   standard Synapse context variables:
+     - user_id           (e.g., "@alice:msg.md-chat.eu")
+     - app_name          (set to "MD-Chat" in homeserver.yaml)
+     - client_base_url   (https://app.md-chat.eu)
+     - server_name       (msg.md-chat.eu)
+
+   Visual style intentionally restrained — most users open email in clients
+   with limited CSS support. Inline styles only; no external assets except a
+   logo served with a 1-year cache header from md-chat.eu.
+#}
+{% extends "_base.html" %}
+
+{% block title %}MD-Chat — Bun venit{% endblock %}
+
+{% block header %}
+  <a href="https://md-chat.eu" style="text-decoration:none;color:inherit">
+    <img src="https://md-chat.eu/static/email/mdchat-logo.svg"
+         alt="MD-Chat"
+         width="200"
+         style="display:block;margin:0 auto 24px;max-width:200px;height:auto">
+  </a>
+{% endblock %}
+
+{% block body %}
+  <h1 style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:22px;color:#1a1a1a;margin:0 0 16px;text-align:center">
+    Bun venit pe MD-Chat
+  </h1>
+
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.55;color:#333;margin:0 0 16px">
+    Salut <strong>{{ user_id }}</strong>,
+  </p>
+
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.55;color:#333;margin:0 0 16px">
+    Contul tău MD-Chat este activ. MD-Chat este un mesager suveran european,
+    operat din Republica Moldova, conform GDPR și Legii RM 195/2024 privind
+    protecția datelor cu caracter personal.
+  </p>
+
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.55;color:#333;margin:0 0 24px">
+    Pentru a începe, deschide aplicația și conectează-te:
+  </p>
+
+  <p style="text-align:center;margin:32px 0">
+    <a href="{{ client_base_url }}"
+       style="display:inline-block;padding:14px 28px;background:#1f6feb;color:#ffffff;text-decoration:none;border-radius:6px;font-family:-apple-system,'Segoe UI',sans-serif;font-size:15px;font-weight:600">
+      Deschide MD-Chat
+    </a>
+  </p>
+
+  <hr style="border:none;border-top:1px solid #e1e4e8;margin:32px 0">
+
+  <h2 style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:16px;color:#1a1a1a;margin:0 0 8px">
+    Ce poți face acum
+  </h2>
+  <ul style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;color:#333;margin:0 0 24px;padding-left:22px">
+    <li>Începe o conversație criptată end-to-end cu un prieten</li>
+    <li>Creează sau alătură-te unei camere publice</li>
+    <li>Personalizează profilul la <code>{{ client_base_url }}/#/settings</code></li>
+    <li>Activează verificarea în doi pași pentru securitate suplimentară</li>
+  </ul>
+
+  <h2 style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:16px;color:#1a1a1a;margin:0 0 8px">
+    Confidențialitate
+  </h2>
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:13px;line-height:1.55;color:#555;margin:0 0 16px">
+    Mesajele tale sunt criptate end-to-end. Operatorul MD-Chat
+    (Mega Promoting SRL) nu poate citi conținutul mesajelor. Vezi nota de
+    confidențialitate completă la
+    <a href="https://md-chat.eu/privacy" style="color:#1f6feb">md-chat.eu/privacy</a>.
+  </p>
+
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:13px;line-height:1.55;color:#555;margin:0 0 16px">
+    Identificatorul tău este <code>{{ user_id }}</code> pe homeserver-ul
+    <code>{{ server_name }}</code>.
+  </p>
+{% endblock %}
+
+{% block footer %}
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;color:#777;text-align:center;margin:24px 0 8px">
+    Ai nevoie de ajutor? Scrie la
+    <a href="mailto:support@md-chat.eu" style="color:#1f6feb">support@md-chat.eu</a>
+    sau vizitează <a href="https://md-chat.eu/help" style="color:#1f6feb">md-chat.eu/help</a>.
+  </p>
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:11px;color:#999;text-align:center;margin:0 0 4px">
+    MD-Chat este operat de <strong>Mega Promoting SRL</strong>, Chișinău, Moldova.
+  </p>
+  <p style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:11px;color:#999;text-align:center;margin:0">
+    Cod sursă disponibil sub AGPLv3 la
+    <a href="https://md-chat.eu/source" style="color:#999">md-chat.eu/source</a>.
+  </p>
+{% endblock %}

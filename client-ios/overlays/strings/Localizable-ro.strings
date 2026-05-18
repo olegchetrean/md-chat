@@ -1,0 +1,35 @@
+/* MD-Chat iOS — Romanian (Moldova baseline) */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (c) 2026 Mega Promoting SRL */
+
+"app_name" = "MD-Chat";
+"login" = "Autentificare";
+"logout" = "Deconectare";
+"settings" = "Setări";
+"privacy" = "Confidențialitate";
+"security" = "Securitate";
+"send" = "Trimite";
+"receive" = "Primește";
+"new_message" = "Mesaj nou";
+"contacts" = "Contacte";
+"rooms" = "Camere";
+"groups" = "Grupuri";
+"channels" = "Canale";
+"call" = "Apel";
+"video_call" = "Apel video";
+"voice_message" = "Mesaj vocal";
+"attach_file" = "Atașează fișier";
+"search" = "Caută";
+"about" = "Despre";
+"help" = "Ajutor";
+"feedback" = "Sugestii";
+"export_my_data" = "Exportă datele mele";
+"delete_account" = "Șterge contul";
+"verify_with_evo" = "Verifică cu EVO";
+"ai_disclosure_title" = "AI integrat";
+"ai_disclosure_body" = "Sunteți pe cale să folosiți o funcție bazată pe inteligență artificială. Conținutul rămâne criptat end-to-end. Procesarea se realizează pe device sau în confidential compute.";
+"ai_disclosure_accept" = "Am înțeles";
+"ai_disclosure_learn_more" = "Politica de confidențialitate";
+"continue" = "Continuă";
+"cancel" = "Anulează";
+"save" = "Salvează";

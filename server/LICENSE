@@ -1,0 +1,19 @@
+MD-Chat homeserver — AGPLv3
+
+Copyright (c) 2026 Mega Promoting SRL
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3.
+
+Full text: https://www.gnu.org/licenses/agpl-3.0.txt
+
+NOTICE: This codebase derives from upstream Synapse maintained by Element
+(https://github.com/element-hq/synapse), also AGPLv3. Upstream copyright is
+retained on unmodified portions; modifications under copyright Mega Promoting
+SRL.
+
+AGPLv3 §13: the public source repository is at
+https://github.com/olegchetrean/md-chat. A `/source` HTTP endpoint redirects
+any user of the running service to that repository (see
+`overlays/patches/0001-add-source-disclosure-endpoint.patch`).
