@@ -39,11 +39,13 @@ def create_app(
             logger.exception("auth blueprint failed to register; continuing")
 
     # eEvidence Regulation (EU 2023/1543) production order portal.
+    # Routes already carry the /v1/legal/eevidence/* prefix inside the blueprint
+    # — mount under /api so final paths become /api/v1/legal/eevidence/*.
     if register_eevidence:
         try:
             from .eevidence import bp as eevidence_bp
 
-            app.register_blueprint(eevidence_bp, url_prefix="/api/v1/legal/eevidence")
+            app.register_blueprint(eevidence_bp, url_prefix="/api")
         except Exception:  # pragma: no cover
             logger.exception("eevidence blueprint failed to register; continuing")
 
