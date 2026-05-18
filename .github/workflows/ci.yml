@@ -38,16 +38,14 @@ jobs:
         continue-on-error: true  # Strict mypy: relax during scaffold phase.
 
       - name: Pytest with coverage
-        # Coverage floor scaffolded at 65% during Sprint 0 (post Cronberry port);
-        # target raises to 70% by Sprint 1 close (wsgi.py, message_optimizer.py,
-        # ai_safety.py need branch coverage tests).
+        # Coverage gate at 70%. Sprint 1 target raises to 80%.
         run: |
           pytest -q \
             --cov=md_chat_ai \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
-            --cov-fail-under=65
+            --cov-fail-under=70
 
       - name: Upload coverage artifact
         if: always()

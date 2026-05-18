@@ -291,6 +291,107 @@ class LLMClient:
         await self.aclose()
 
     # ------------------------------------------------------------------
+    # Sync compatibility shim
+    # ------------------------------------------------------------------
+    # The Cronberry-derived twin/optimizer code calls ``chat()`` and
+    # ``chat_json()`` synchronously with a list of OpenAI-style messages.
+    # We bridge to the async ``complete()`` here. Inside an existing event
+    # loop (e.g. async Flask views) the caller MUST use ``complete()``
+    # directly — these sync wrappers will raise.
+
+    @staticmethod
+    def _flatten_messages(messages: list[dict[str, str]]) -> tuple[str, str | None]:
+        """Convert OpenAI-style messages → (prompt, system) pair.
+
+        Concatenates non-system turns into a single prompt; the last
+        ``system`` role becomes the system instruction.
+        """
+        system: str | None = None
+        parts: list[str] = []
+        for m in messages:
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            if role == "system":
+                system = content if system is None else f"{system}\n\n{content}"
+            else:
+                parts.append(f"{role.upper()}: {content}")
+        prompt = "\n\n".join(parts).strip() or " "
+        return prompt, system
+
+    def chat(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        model: str = "claude-sonnet-4-5",
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+    ) -> str:
+        """Synchronous chat — returns response text only.
+
+        Wrapper around ``complete()`` for Cronberry-style callers. Must not be
+        called from inside an active event loop.
+        """
+        import asyncio
+
+        prompt, system = self._flatten_messages(messages)
+
+        async def _run() -> str:
+            resp = await self.complete(
+                prompt,
+                model=model,
+                max_tokens=max_tokens,
+                system=system,
+                temperature=temperature,
+            )
+            return resp.content
+
+        try:
+            return asyncio.run(_run())
+        except RuntimeError as exc:
+            if "asyncio.run() cannot be called from a running event loop" in str(exc):
+                raise RuntimeError(
+                    "LLMClient.chat() cannot be used inside an async context — "
+                    "call `await self.complete(...)` directly."
+                ) from exc
+            raise
+
+    def chat_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        model: str = "claude-sonnet-4-5",
+        max_tokens: int = 1024,
+        temperature: float = 0.5,
+    ) -> dict[str, Any]:
+        """Synchronous chat — parses response as JSON.
+
+        Falls back to ``{}`` on parse error rather than raising, matching the
+        Cronberry idiom of best-effort structured responses.
+        """
+        import json
+
+        text = self.chat(
+            messages,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        try:
+            # Strip common code-fence wrappers.
+            stripped = text.strip()
+            if stripped.startswith("```"):
+                lines = stripped.splitlines()
+                # Drop leading ``` fence (with optional language tag) and trailing ```.
+                if lines and lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                stripped = "\n".join(lines)
+            return json.loads(stripped)
+        except (json.JSONDecodeError, ValueError):
+            return {}
+
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 

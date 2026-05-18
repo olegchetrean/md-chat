@@ -81,9 +81,9 @@ def test_health_payload_includes_config_flags(client):
 # expected to fulfil. Missing blueprints SKIP rather than FAIL.
 EXPECTED_BLUEPRINTS: dict[str, list[str]] = {
     "health": ["/api/health", "/api/ready"],
-    "auth": ["/api/auth"],
-    "identity": ["/api/v1/identity"],
-    "eevidence": ["/api/eevidence"],
+    "auth": ["/api/v1/auth"],
+    "identity": ["/api/v1/identity", "/oidc"],
+    "eevidence": ["/api/v1/legal/eevidence"],
 }
 
 
